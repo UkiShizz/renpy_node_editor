@@ -51,11 +51,20 @@ class ConnectionItem(QGraphicsPathItem):
         """Redraw smooth curve between ports"""
         if not self.src_port:
             return
-
-        p1: QPointF = self.src_port.scenePos()
+        
+        # Проверяем, что порт еще существует (не удален)
+        try:
+            p1: QPointF = self.src_port.scenePos()
+        except RuntimeError:
+            # Порт уже удален
+            return
 
         if self.dst_port is not None:
-            p2: QPointF = self.dst_port.scenePos()
+            try:
+                p2: QPointF = self.dst_port.scenePos()
+            except RuntimeError:
+                # Порт уже удален
+                p2 = p1
         elif self._tmp_end is not None:
             p2: QPointF = self._tmp_end
         else:

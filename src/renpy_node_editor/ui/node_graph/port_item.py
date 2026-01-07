@@ -90,8 +90,14 @@ class PortItem(QGraphicsEllipseItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemScenePositionHasChanged:
-            for c in self.connections:
-                c.update_path()
+            # Создаем копию списка, чтобы избежать проблем при удалении
+            for c in list(self.connections):
+                try:
+                    c.update_path()
+                except (RuntimeError, AttributeError):
+                    # Связь уже удалена, удаляем из списка
+                    if c in self.connections:
+                        self.connections.remove(c)
         return super().itemChange(change, value)
 
     # ---- visual details ----

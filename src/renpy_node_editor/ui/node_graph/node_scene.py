@@ -326,7 +326,24 @@ class NodeScene(QGraphicsScene):
         
         if reply == QMessageBox.Yes:
             for item in selected_items:
-                # Удаляем из модели (это также удалит порты и связи)
+                # Сначала очищаем все связи от портов
+                for port in item.inputs + item.outputs:
+                    # Создаем копию списка connections
+                    connections_copy = list(port.connections)
+                    for conn in connections_copy:
+                        # Удаляем связь из модели
+                        if conn.connection_id and self._scene_model:
+                            self._scene_model.remove_connection(conn.connection_id)
+                        # Отсоединяем от портов
+                        if conn.src_port and conn in conn.src_port.connections:
+                            conn.src_port.remove_connection(conn)
+                        if conn.dst_port and conn in conn.dst_port.connections:
+                            conn.dst_port.remove_connection(conn)
+                        # Удаляем визуально
+                        if conn in self.items():
+                            self.removeItem(conn)
+                
+                # Удаляем из модели (это также удалит порты)
                 self._scene_model.remove_block(item.block.id)
                 # Удаляем визуально
                 self.removeItem(item)
