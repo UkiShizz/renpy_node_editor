@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 import uuid
 
-from PySide6.QtCore import QRectF, Qt, QPointF, Signal
+from PySide6.QtCore import QRectF, Qt, QPointF, Signal, QTimer
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent,
@@ -47,6 +47,10 @@ class NodeScene(QGraphicsScene):
         self._drag_connection: Optional[ConnectionItem] = None
         self._drag_src_port: Optional[PortItem] = None
         
+        # Для отложенного выполнения set_project_and_scene
+        self._pending_project: Optional[Project] = None
+        self._pending_scene: Optional[Scene] = None
+        
         # Connect selection changed signal
         self.selectionChanged.connect(self._on_selection_changed)
 
@@ -54,6 +58,21 @@ class NodeScene(QGraphicsScene):
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
+        # Сохраняем параметры для отложенного выполнения
+        self._pending_project = project
+        self._pending_scene = scene
+        
+        # Используем QTimer для отложенного выполнения, чтобы избежать проблем с event loop
+        QTimer.singleShot(0, self._do_set_project_and_scene)
+    
+    def _do_set_project_and_scene(self) -> None:
+        """Фактическое выполнение установки проекта и сцены"""
+        project = self._pending_project
+        scene = self._pending_scene
+        
+        if not project or not scene:
+            return
+        
         # Блокируем сигналы во время перезагрузки, чтобы избежать проблем
         self.blockSignals(True)
         try:
@@ -67,41 +86,41 @@ class NodeScene(QGraphicsScene):
             self._drag_src_port = None
             
             # ВАЖНО: Перед clear() нужно вручную очистить все соединения из портов
-            # чтобы избежать проблем с удаленными элементами
+            # и удалить элементы вручную, чтобы избежать проблем с Qt
             try:
-                for item in list(self.items()):
+                # Собираем все элементы для удаления
+                items_to_remove = list(self.items())
+                
+                # Сначала очищаем соединения из портов
+                for item in items_to_remove:
                     if isinstance(item, NodeItem):
                         # Очищаем соединения из всех портов
                         for port in item.inputs + item.outputs:
                             if port and hasattr(port, 'connections'):
-                                # Очищаем список соединений без вызова detach_from
-                                # так как элементы будут удалены clear()
+                                # Очищаем список соединений
                                 port.connections.clear()
+                
+                # Удаляем все элементы вручную (вместо clear())
+                for item in items_to_remove:
+                    try:
+                        # Удаляем элемент из сцены
+                        if item.scene() == self:
+                            self.removeItem(item)
+                    except Exception:
+                        pass
             except Exception as e:
-                print(f"Warning: error clearing port connections: {e}")
+                print(f"Warning: error clearing items: {e}")
+                # Если ручное удаление не сработало, пробуем clear()
+                try:
+                    self.clear()
+                except Exception:
+                    pass
             
-            # Очищаем сцену перед загрузкой новой
-            # Временно отключаем сигнал selectionChanged чтобы избежать проблем
+            # Временно отключаем сигнал selectionChanged
             try:
                 self.selectionChanged.disconnect()
             except Exception:
                 pass
-            
-            # Очищаем сцену
-            try:
-                self.clear()
-            except Exception as e:
-                print(f"Warning: error in clear(): {e}")
-                # Пытаемся удалить элементы вручную
-                try:
-                    items_to_remove = list(self.items())
-                    for item in items_to_remove:
-                        try:
-                            self.removeItem(item)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
             
             # Восстанавливаем сигнал selectionChanged
             try:
@@ -131,7 +150,7 @@ class NodeScene(QGraphicsScene):
         except Exception as e:
             # Логируем ошибку для отладки
             import traceback
-            print(f"Error in set_project_and_scene: {e}")
+            print(f"Error in _do_set_project_and_scene: {e}")
             print(traceback.format_exc())
             # Пытаемся восстановить состояние
             try:
@@ -147,7 +166,14 @@ class NodeScene(QGraphicsScene):
                 except Exception:
                     pass
                 try:
-                    self.clear()
+                    # Пробуем очистить вручную
+                    items_to_remove = list(self.items())
+                    for item in items_to_remove:
+                        try:
+                            if item.scene() == self:
+                                self.removeItem(item)
+                        except Exception:
+                            pass
                 except Exception:
                     pass
                 try:
@@ -159,6 +185,9 @@ class NodeScene(QGraphicsScene):
             except Exception as e2:
                 print(f"Error in recovery: {e2}")
         finally:
+            # Очищаем pending значения
+            self._pending_project = None
+            self._pending_scene = None
             # Разблокируем сигналы
             try:
                 self.blockSignals(False)
