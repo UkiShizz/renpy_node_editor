@@ -197,6 +197,19 @@ class MainWindow(QMainWindow):
         
         # Connect properties saved signal to update node display
         self.properties_panel.properties_saved.connect(self._on_properties_saved)
+        
+        # Загружаем сохраненные пропорции
+        self._load_splitter_sizes()
+        
+        # Сохраняем пропорции при изменении
+        self.main_splitter.splitterMoved.connect(
+            lambda pos, index: self._on_splitter_moved("main", pos, index)
+        )
+        self.right_splitter.splitterMoved.connect(
+            lambda pos, index: self._on_splitter_moved("right", pos, index)
+        )
+
+        self.setCentralWidget(central)
     
     def _connect_scene_signals(self) -> None:
         """Подключить сигналы сцены к панели свойств"""
@@ -215,19 +228,6 @@ class MainWindow(QMainWindow):
                     )
         except Exception as e:
             print(f"Warning: error connecting scene signals: {e}")
-        
-        # Загружаем сохраненные пропорции
-        self._load_splitter_sizes()
-        
-        # Сохраняем пропорции при изменении
-        self.main_splitter.splitterMoved.connect(
-            lambda pos, index: self._on_splitter_moved("main", pos, index)
-        )
-        self.right_splitter.splitterMoved.connect(
-            lambda pos, index: self._on_splitter_moved("right", pos, index)
-        )
-
-        self.setCentralWidget(central)
     
     def _create_default_project(self) -> None:
         """Создать новый чистый проект при старте"""
