@@ -1,7 +1,7 @@
 """Main Ren'Py code generator"""
 from __future__ import annotations
 
-from typing import List, Dict, Set, Optional
+from typing import List, Dict, Set, Optional, Tuple
 from renpy_node_editor.core.model import Project, Scene, Block, BlockType
 from renpy_node_editor.core.generator.utils import (
     get_block_connections, find_start_blocks, INDENT
@@ -34,11 +34,14 @@ def generate_block(block: Block, indent: str) -> str:
 def generate_block_chain(
     scene: Scene,
     start_block_id: str,
-    connections_map: Dict[str, List[str]],
+    connections_map: Dict[str, List[Tuple[str, float]]],
     visited: Set[str],
     indent: str
 ) -> str:
-    """Recursively generate chain of blocks"""
+    """
+    Recursively generate chain of blocks.
+    For parallel connections, processes shorter connections first.
+    """
     if start_block_id in visited:
         return ""  # Prevent cycles
     
@@ -53,7 +56,9 @@ def generate_block_chain(
     if block.type == BlockType.IF:
         condition = block.params.get("condition", "").strip()
         if condition:
-            next_blocks = connections_map.get(block.id, [])
+            # Get connections sorted by distance
+            next_blocks_with_dist = connections_map.get(block.id, [])
+            next_blocks = [block_id for block_id, _ in next_blocks_with_dist]
             
             true_branch = ""
             false_branch = ""
@@ -73,7 +78,8 @@ def generate_block_chain(
     elif block.type == BlockType.WHILE:
         condition = block.params.get("condition", "").strip()
         if condition:
-            next_blocks = connections_map.get(block.id, [])
+            next_blocks_with_dist = connections_map.get(block.id, [])
+            next_blocks = [block_id for block_id, _ in next_blocks_with_dist]
             loop_body = ""
             
             if next_blocks:
@@ -87,7 +93,8 @@ def generate_block_chain(
         var = block.params.get("variable", "").strip()
         iterable = block.params.get("iterable", "").strip()
         if var and iterable:
-            next_blocks = connections_map.get(block.id, [])
+            next_blocks_with_dist = connections_map.get(block.id, [])
+            next_blocks = [block_id for block_id, _ in next_blocks_with_dist]
             loop_body = ""
             
             if next_blocks:
@@ -102,9 +109,10 @@ def generate_block_chain(
         if code:
             lines.append(code)
         
-        # Continue through connections
-        next_blocks = connections_map.get(block.id, [])
-        for next_id in next_blocks:
+        # Continue through connections (already sorted by distance)
+        # Process shorter connections first for parallel branches
+        next_blocks_with_dist = connections_map.get(block.id, [])
+        for next_id, _ in next_blocks_with_dist:
             if next_id not in visited:
                 next_code = generate_block_chain(
                     scene, next_id, connections_map, visited.copy(), indent
@@ -150,7 +158,9 @@ def generate_scene(scene: Scene) -> str:
             stack = [start_block.id]
             while stack:
                 current_id = stack.pop()
-                for next_id in connections_map.get(current_id, []):
+                # Extract block IDs from (block_id, distance) tuples
+                next_blocks_with_dist = connections_map.get(current_id, [])
+                for next_id, _ in next_blocks_with_dist:
                     if next_id not in processed:
                         processed.add(next_id)
                         stack.append(next_id)
