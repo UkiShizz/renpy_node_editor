@@ -8,7 +8,7 @@ from renpy_node_editor.core.generator.utils import (
 )
 from renpy_node_editor.core.generator.blocks import (
     generate_label, generate_if, generate_while, generate_for,
-    BLOCK_GENERATORS
+    BLOCK_GENERATORS, safe_get_str
 )
 
 
@@ -24,7 +24,7 @@ def generate_block(block: Block, indent: str) -> str:
     
     # Handle LABEL block
     if block.type == BlockType.LABEL:
-        label = block.params.get("label", "").strip()
+        label = safe_get_str(block.params, "label")
         if label:
             return f"label {label}:\n"
     
@@ -54,7 +54,7 @@ def generate_block_chain(
     
     # Generate code for current block
     if block.type == BlockType.IF:
-        condition = block.params.get("condition", "").strip()
+        condition = safe_get_str(block.params, "condition")
         if condition:
             # Get connections sorted by distance
             next_blocks_with_dist = connections_map.get(block.id, [])
@@ -76,7 +76,7 @@ def generate_block_chain(
             from renpy_node_editor.core.generator.blocks import generate_if
             lines.append(generate_if(block, indent, true_branch, false_branch))
     elif block.type == BlockType.WHILE:
-        condition = block.params.get("condition", "").strip()
+        condition = safe_get_str(block.params, "condition")
         if condition:
             next_blocks_with_dist = connections_map.get(block.id, [])
             next_blocks = [block_id for block_id, _ in next_blocks_with_dist]
@@ -90,8 +90,8 @@ def generate_block_chain(
             from renpy_node_editor.core.generator.blocks import generate_while
             lines.append(generate_while(block, indent, loop_body))
     elif block.type == BlockType.FOR:
-        var = block.params.get("variable", "").strip()
-        iterable = block.params.get("iterable", "").strip()
+        var = safe_get_str(block.params, "variable")
+        iterable = safe_get_str(block.params, "iterable")
         if var and iterable:
             next_blocks_with_dist = connections_map.get(block.id, [])
             next_blocks = [block_id for block_id, _ in next_blocks_with_dist]
@@ -187,15 +187,15 @@ def extract_characters(project: Project) -> Set[str]:
     for scene in project.scenes:
         for block in scene.blocks:
             if block.type == BlockType.SAY:
-                who = block.params.get("who", "").strip()
+                who = safe_get_str(block.params, "who")
                 if who:
                     characters.add(who)
             elif block.type in (BlockType.SHOW, BlockType.HIDE):
-                char = block.params.get("character", "").strip()
+                char = safe_get_str(block.params, "character")
                 if char:
                     characters.add(char)
             elif block.type == BlockType.CHARACTER:
-                name = block.params.get("name", "").strip()
+                name = safe_get_str(block.params, "name")
                 if name:
                     characters.add(name)
     

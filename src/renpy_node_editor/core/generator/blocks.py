@@ -1,9 +1,17 @@
 """Block code generators"""
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Any
 from renpy_node_editor.core.model import Block, BlockType, Scene
 from renpy_node_editor.core.generator.utils import INDENT, escape_text, format_value
+
+
+def safe_get_str(params: dict[str, Any], key: str, default: str = "") -> str:
+    """Safely get string parameter, handling None values"""
+    value = params.get(key, default)
+    if value is None:
+        return default
+    return str(value).strip()
 
 
 def generate_label(scene: Scene) -> str:
@@ -13,8 +21,8 @@ def generate_label(scene: Scene) -> str:
 
 def generate_say(block: Block, indent: str) -> str:
     """Generate character dialogue"""
-    who = block.params.get("who", "").strip()
-    text = block.params.get("text", "").strip()
+    who = safe_get_str(block.params, "who")
+    text = safe_get_str(block.params, "text")
     
     if not text:
         return ""
@@ -23,15 +31,15 @@ def generate_say(block: Block, indent: str) -> str:
     
     attrs = []
     if who:
-        expression = block.params.get("expression", "").strip()
+        expression = safe_get_str(block.params, "expression")
         if expression:
             who = f"{who} {expression}"
         
-        at_pos = block.params.get("at", "").strip()
+        at_pos = safe_get_str(block.params, "at")
         if at_pos:
             attrs.append(f"at {at_pos}")
         
-        with_trans = block.params.get("with_transition", "").strip()
+        with_trans = safe_get_str(block.params, "with_transition")
         if with_trans:
             attrs.append(f"with {with_trans}")
         
@@ -45,12 +53,12 @@ def generate_say(block: Block, indent: str) -> str:
 
 def generate_narration(block: Block, indent: str) -> str:
     """Generate narration text"""
-    text = block.params.get("text", "").strip()
+    text = safe_get_str(block.params, "text")
     if not text:
         return ""
     
     text = escape_text(text)
-    with_trans = block.params.get("with_transition", "").strip()
+    with_trans = safe_get_str(block.params, "with_transition")
     
     if with_trans:
         return f"{indent}\"{text}\" with {with_trans}\n"
@@ -61,7 +69,7 @@ def generate_narration(block: Block, indent: str) -> str:
 def generate_menu(block: Block, indent: str) -> str:
     """Generate menu with choices"""
     lines: list[str] = []
-    question = block.params.get("question", "").strip()
+    question = safe_get_str(block.params, "question")
     
     if question:
         question = escape_text(question)
@@ -81,11 +89,11 @@ def generate_menu(block: Block, indent: str) -> str:
     
     for choice in choices:
         if isinstance(choice, dict):
-            text = choice.get("text", "").strip()
-            jump = choice.get("jump", "").strip()
-            condition = choice.get("condition", "").strip()
+            text = safe_get_str(choice, "text")
+            jump = safe_get_str(choice, "jump")
+            condition = safe_get_str(choice, "condition")
         else:
-            text = str(choice).strip()
+            text = str(choice).strip() if choice is not None else ""
             jump = ""
             condition = ""
         
@@ -110,7 +118,7 @@ def generate_menu(block: Block, indent: str) -> str:
 
 def generate_if(block: Block, indent: str, true_branch: Optional[str] = None, false_branch: Optional[str] = None) -> str:
     """Generate if statement"""
-    condition = block.params.get("condition", "").strip()
+    condition = safe_get_str(block.params, "condition")
     if not condition:
         return ""
     
@@ -139,7 +147,7 @@ def generate_if(block: Block, indent: str, true_branch: Optional[str] = None, fa
 
 def generate_while(block: Block, indent: str, loop_body: Optional[str] = None) -> str:
     """Generate while loop"""
-    condition = block.params.get("condition", "").strip()
+    condition = safe_get_str(block.params, "condition")
     if not condition:
         return ""
     
@@ -160,8 +168,8 @@ def generate_while(block: Block, indent: str, loop_body: Optional[str] = None) -
 
 def generate_for(block: Block, indent: str, loop_body: Optional[str] = None) -> str:
     """Generate for loop"""
-    var = block.params.get("variable", "").strip()
-    iterable = block.params.get("iterable", "").strip()
+    var = safe_get_str(block.params, "variable")
+    iterable = safe_get_str(block.params, "iterable")
     
     if not var or not iterable:
         return ""
@@ -183,7 +191,7 @@ def generate_for(block: Block, indent: str, loop_body: Optional[str] = None) -> 
 
 def generate_jump(block: Block, indent: str) -> str:
     """Generate jump statement"""
-    target = block.params.get("target", "").strip()
+    target = safe_get_str(block.params, "target")
     if not target:
         return ""
     return f"{indent}jump {target}\n"
@@ -191,7 +199,7 @@ def generate_jump(block: Block, indent: str) -> str:
 
 def generate_call(block: Block, indent: str) -> str:
     """Generate call statement"""
-    label = block.params.get("label", "").strip()
+    label = safe_get_str(block.params, "label")
     if not label:
         return ""
     return f"{indent}call {label}\n"
@@ -204,15 +212,15 @@ def generate_return(block: Block, indent: str) -> str:
 
 def generate_scene(block: Block, indent: str) -> str:
     """Generate scene statement"""
-    bg = block.params.get("background", "black").strip()
+    bg = safe_get_str(block.params, "background", "black")
     if not bg:
         bg = "black"
     
-    layer = block.params.get("layer", "").strip()
+    layer = safe_get_str(block.params, "layer")
     if layer:
         bg = f"{bg} onlayer {layer}"
     
-    trans = block.params.get("transition", "").strip()
+    trans = safe_get_str(block.params, "transition")
     line = f"{indent}scene {bg}"
     if trans:
         line += f" with {trans}"
@@ -221,15 +229,15 @@ def generate_scene(block: Block, indent: str) -> str:
 
 def generate_show(block: Block, indent: str) -> str:
     """Generate show statement"""
-    char = block.params.get("character", "").strip()
+    char = safe_get_str(block.params, "character")
     if not char:
         return ""
     
-    expr = block.params.get("expression", "").strip()
-    at = block.params.get("at", "").strip()
-    behind = block.params.get("behind", "").strip()
-    zorder = block.params.get("zorder", "").strip()
-    layer = block.params.get("layer", "").strip()
+    expr = safe_get_str(block.params, "expression")
+    at = safe_get_str(block.params, "at")
+    behind = safe_get_str(block.params, "behind")
+    zorder = safe_get_str(block.params, "zorder")
+    layer = safe_get_str(block.params, "layer")
     
     parts = [char]
     if expr:
@@ -246,7 +254,7 @@ def generate_show(block: Block, indent: str) -> str:
     if layer:
         line += f" onlayer {layer}"
     
-    trans = block.params.get("transition", "").strip()
+    trans = safe_get_str(block.params, "transition")
     if trans:
         line += f" with {trans}"
     
@@ -255,17 +263,17 @@ def generate_show(block: Block, indent: str) -> str:
 
 def generate_hide(block: Block, indent: str) -> str:
     """Generate hide statement"""
-    char = block.params.get("character", "").strip()
+    char = safe_get_str(block.params, "character")
     if not char:
         return ""
     
     line = f"{indent}hide {char}"
     
-    layer = block.params.get("layer", "").strip()
+    layer = safe_get_str(block.params, "layer")
     if layer:
         line += f" onlayer {layer}"
     
-    trans = block.params.get("transition", "").strip()
+    trans = safe_get_str(block.params, "transition")
     if trans:
         line += f" with {trans}"
     
@@ -274,8 +282,8 @@ def generate_hide(block: Block, indent: str) -> str:
 
 def generate_image(block: Block, indent: str) -> str:
     """Generate image definition"""
-    name = block.params.get("name", "").strip()
-    path = block.params.get("path", "").strip()
+    name = safe_get_str(block.params, "name")
+    path = safe_get_str(block.params, "path")
     
     if not name or not path:
         return ""
@@ -285,7 +293,7 @@ def generate_image(block: Block, indent: str) -> str:
 
 def generate_pause(block: Block, indent: str) -> str:
     """Generate pause statement"""
-    duration = block.params.get("duration", "1.0")
+    duration = safe_get_str(block.params, "duration", "1.0")
     try:
         float(duration)
         return f"{indent}$ renpy.pause({duration})\n"
@@ -295,7 +303,7 @@ def generate_pause(block: Block, indent: str) -> str:
 
 def generate_transition(block: Block, indent: str) -> str:
     """Generate transition statement"""
-    trans = block.params.get("transition", "dissolve").strip()
+    trans = safe_get_str(block.params, "transition", "dissolve")
     if not trans:
         trans = "dissolve"
     return f"{indent}with {trans}\n"
@@ -303,7 +311,7 @@ def generate_transition(block: Block, indent: str) -> str:
 
 def generate_with(block: Block, indent: str) -> str:
     """Generate with statement"""
-    trans = block.params.get("transition", "dissolve").strip()
+    trans = safe_get_str(block.params, "transition", "dissolve")
     if not trans:
         trans = "dissolve"
     return f"{indent}with {trans}\n"
@@ -311,15 +319,15 @@ def generate_with(block: Block, indent: str) -> str:
 
 def generate_sound(block: Block, indent: str) -> str:
     """Generate play sound statement"""
-    sound_file = block.params.get("sound_file", "").strip()
+    sound_file = safe_get_str(block.params, "sound_file")
     if not sound_file:
         return ""
     
     line = f"{indent}play sound \"{sound_file}\""
     
-    fadein = block.params.get("fadein", "").strip()
-    fadeout = block.params.get("fadeout", "").strip()
-    loop = block.params.get("loop", "").strip().lower()
+    fadein = safe_get_str(block.params, "fadein")
+    fadeout = safe_get_str(block.params, "fadeout")
+    loop = safe_get_str(block.params, "loop").lower()
     
     if fadein:
         line += f" fadein {fadein}"
@@ -333,15 +341,15 @@ def generate_sound(block: Block, indent: str) -> str:
 
 def generate_music(block: Block, indent: str) -> str:
     """Generate play music statement"""
-    music_file = block.params.get("music_file", "").strip()
+    music_file = safe_get_str(block.params, "music_file")
     if not music_file:
         return ""
     
     line = f"{indent}play music \"{music_file}\""
     
-    fadein = block.params.get("fadein", "").strip()
-    fadeout = block.params.get("fadeout", "").strip()
-    loop = block.params.get("loop", "True").strip().lower()
+    fadein = safe_get_str(block.params, "fadein")
+    fadeout = safe_get_str(block.params, "fadeout")
+    loop = safe_get_str(block.params, "loop", "True").lower()
     
     if fadein:
         line += f" fadein {fadein}"
@@ -357,7 +365,7 @@ def generate_music(block: Block, indent: str) -> str:
 
 def generate_stop_music(block: Block, indent: str) -> str:
     """Generate stop music statement"""
-    fadeout = block.params.get("fadeout", "").strip()
+    fadeout = safe_get_str(block.params, "fadeout")
     if fadeout:
         return f"{indent}stop music fadeout {fadeout}\n"
     return f"{indent}stop music\n"
@@ -365,7 +373,7 @@ def generate_stop_music(block: Block, indent: str) -> str:
 
 def generate_stop_sound(block: Block, indent: str) -> str:
     """Generate stop sound statement"""
-    fadeout = block.params.get("fadeout", "").strip()
+    fadeout = safe_get_str(block.params, "fadeout")
     if fadeout:
         return f"{indent}stop sound fadeout {fadeout}\n"
     return f"{indent}stop sound\n"
@@ -373,14 +381,14 @@ def generate_stop_sound(block: Block, indent: str) -> str:
 
 def generate_queue_music(block: Block, indent: str) -> str:
     """Generate queue music statement"""
-    music_file = block.params.get("music_file", "").strip()
+    music_file = safe_get_str(block.params, "music_file")
     if not music_file:
         return ""
     
     line = f"{indent}queue music \"{music_file}\""
     
-    fadein = block.params.get("fadein", "").strip()
-    loop = block.params.get("loop", "").strip().lower()
+    fadein = safe_get_str(block.params, "fadein")
+    loop = safe_get_str(block.params, "loop").lower()
     
     if fadein:
         line += f" fadein {fadein}"
@@ -392,13 +400,13 @@ def generate_queue_music(block: Block, indent: str) -> str:
 
 def generate_queue_sound(block: Block, indent: str) -> str:
     """Generate queue sound statement"""
-    sound_file = block.params.get("sound_file", "").strip()
+    sound_file = safe_get_str(block.params, "sound_file")
     if not sound_file:
         return ""
     
     line = f"{indent}queue sound \"{sound_file}\""
     
-    fadein = block.params.get("fadein", "").strip()
+    fadein = safe_get_str(block.params, "fadein")
     if fadein:
         line += f" fadein {fadein}"
     
@@ -407,8 +415,8 @@ def generate_queue_sound(block: Block, indent: str) -> str:
 
 def generate_set_var(block: Block, indent: str) -> str:
     """Generate variable assignment"""
-    var = block.params.get("variable", "").strip()
-    value = block.params.get("value", "").strip()
+    var = safe_get_str(block.params, "variable")
+    value = safe_get_str(block.params, "value")
     
     if not var:
         return ""
@@ -418,8 +426,8 @@ def generate_set_var(block: Block, indent: str) -> str:
 
 def generate_default(block: Block, indent: str) -> str:
     """Generate default statement"""
-    var = block.params.get("variable", "").strip()
-    value = block.params.get("value", "").strip()
+    var = safe_get_str(block.params, "variable")
+    value = safe_get_str(block.params, "value")
     
     if not var:
         return ""
@@ -429,8 +437,8 @@ def generate_default(block: Block, indent: str) -> str:
 
 def generate_define(block: Block, indent: str) -> str:
     """Generate define statement"""
-    name = block.params.get("name", "").strip()
-    value = block.params.get("value", "").strip()
+    name = safe_get_str(block.params, "name")
+    value = safe_get_str(block.params, "value")
     
     if not name:
         return ""
@@ -440,7 +448,7 @@ def generate_define(block: Block, indent: str) -> str:
 
 def generate_python(block: Block, indent: str) -> str:
     """Generate python code block"""
-    code = block.params.get("code", "").strip()
+    code = safe_get_str(block.params, "code")
     if not code:
         return ""
     
@@ -458,8 +466,8 @@ def generate_python(block: Block, indent: str) -> str:
 
 def generate_character(block: Block, indent: str) -> str:
     """Generate character definition"""
-    name = block.params.get("name", "").strip()
-    display_name = block.params.get("display_name", "").strip()
+    name = safe_get_str(block.params, "name")
+    display_name = safe_get_str(block.params, "display_name")
     
     if not name:
         return ""
@@ -473,7 +481,7 @@ def generate_character(block: Block, indent: str) -> str:
 
 def generate_voice(block: Block, indent: str) -> str:
     """Generate voice statement"""
-    voice_file = block.params.get("voice_file", "").strip()
+    voice_file = safe_get_str(block.params, "voice_file")
     if not voice_file:
         return ""
     
@@ -482,7 +490,7 @@ def generate_voice(block: Block, indent: str) -> str:
 
 def generate_center(block: Block, indent: str) -> str:
     """Generate centered text"""
-    text = block.params.get("text", "").strip()
+    text = safe_get_str(block.params, "text")
     if not text:
         return ""
     
@@ -492,14 +500,14 @@ def generate_center(block: Block, indent: str) -> str:
 
 def generate_text(block: Block, indent: str) -> str:
     """Generate text statement"""
-    text = block.params.get("text", "").strip()
+    text = safe_get_str(block.params, "text")
     if not text:
         return ""
     
     text = escape_text(text)
     
-    xpos = block.params.get("xpos", "").strip()
-    ypos = block.params.get("ypos", "").strip()
+    xpos = safe_get_str(block.params, "xpos")
+    ypos = safe_get_str(block.params, "ypos")
     
     line = f"{indent}text \"{text}\""
     if xpos:
