@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+from typing import Optional
+
+from PySide6.QtCore import QRectF, Qt, QPointF
+from PySide6.QtGui import QPainter, QPen, QColor
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent
+
+from renpy_node_editor.core.model import Project, Scene, Block, BlockType
+from renpy_node_editor.ui.block_palette import MIME_NODE_TYPE
+from renpy_node_editor.ui.node_graph.node_item import NodeItem
+
+
+GRID_SMALL = 16
+GRID_BIG = 64
+
+
+class NodeScene(QGraphicsScene):
+    """
+    Сцена нодового редактора:
+    - рисует сетку
+    - хранит NodeItem'ы
+    - принимает drag&drop из BlockPalette
+    """
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        self._project: Optional[Project] = None
+        self._scene_model: Optional[Scene] = None
+
+        self.setBackgroundBrush(QColor("#202020"))
+        self.setItemIndexMethod(QGraphicsScene.NoIndex)
+        self.setSceneRect(-5000, -5000, 10000, 10000)
+
+    # ---- привязка к модели ----
+
+    def set_project_and_scene(self, project: Project, scene: Scene) -> None:
+        self.clear()
+        self._project = project
+        self._scene_model = scene
+
+        for block in scene.blocks:
+            self._create_node_item_for_block(block)
+
+    def _create_node_item_for_block(self, block: Block) -> NodeItem:
+        item = NodeItem(block)
+        self.addItem(item)
+        return item
+
+    # ---- сетка ----
+
+    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:  # type: ignore[override]
+        super().drawBackground(painter, rect)
+
+        left = int(rect.left()) - (int(rect.left()) % GRID_SMALL)
+        top = int(rect.top()) - (int(rect.top()) % GRID_SMALL)
+
+        painter.setPen(QPen(QColor("#303030"), 1))
+        x = left
+        while x < rect.right():
+            painter.drawLine(x, rect.top(), x, rect.bottom())
+            x += GRID_SMALL
+
+        y = top
+        while y < rect.bottom():
+            painter.drawLine(rect.left(), y, rect.right(), y)
+            y += GRID_SMALL
+
+        painter.setPen(QPen(QColor("#404040"), 1))
+        left_big = int(rect.left()) - (int(rect.left()) % GRID_BIG)
+        top_big = int(rect.top()) - (int(rect.top()) % GRID_BIG)
+
+        x = left_big
+        while x < rect.right():
+            painter.drawLine(x, rect.top(), x, rect.bottom())
+            x += GRID_BIG
+
+        y = top_big
+        while y < rect.bottom():
+            painter.drawLine(rect.left(), y, rect.right(), y)
+            y += GRID_BIG
+
+    # ---- drag&drop из палитры ----
+
+    def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent) -> None:  # type: ignore[override]
+        mime = event.mimeData()
+        if mime.hasFormat(MIME_NODE_TYPE):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event: QGraphicsSceneDragDropEvent) -> None:  # type: ignore[override]
+        mime = event.mimeData()
+        if mime.hasFormat(MIME_NODE_TYPE):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QGraphicsSceneDragDropEvent) -> None:  # type: ignore[override]
+        print("DROP EVENT", event.scenePos())  # временно для дебага
+
+        mime = event.mimeData()
+        if not mime.hasFormat(MIME_NODE_TYPE):
+            event.ignore()
+            return
+
+        if not self._scene_model:
+            event.ignore()
+            return
+
+        data = mime.data(MIME_NODE_TYPE)
+        if not data:
+            event.ignore()
+            return
+
+        block_type_name = bytes(data).decode("utf-8")
+
+        try:
+            block_type = BlockType[block_type_name]
+        except KeyError:
+            event.ignore()
+            return
+
+        pos: QPointF = event.scenePos()
+
+        block = Block(
+            id=str(id(object())),
+            type=block_type,
+            params={},
+            x=pos.x(),
+            y=pos.y(),
+        )
+        self._scene_model.add_block(block)
+
+        self._create_node_item_for_block(block)
+
+        event.acceptProposedAction()
+        print("DROP OK", block_type_name, pos)

@@ -1,0 +1,52 @@
+# \# RenPy Node Editor
+
+# 
+
+# Нормальный десктоп‑редактор на Python + PySide6, чтобы собирать Ren'Py‑скрипт из нодового графа:
+
+# диалоги, меню, сцены, переходы — всё блоками с “проводами”, а не ручным ковырянием `.rpy` файлов.
+
+# 
+
+# \## Что это
+
+# 
+
+# \- \*\*Node‑граф\*\*: сцены как граф нод (Block), порты, соединения (Connection).
+
+# \- \*\*Генерация Ren'Py\*\*: по графу генерится `script.rpy` с `label`, `menu`, `jump`, `scene`, `show`.
+
+# \- \*\*Запуск\*\*: экспорт скрипта в существующий Ren'Py‑проект и запуск через Ren'Py SDK (CLI).
+
+# \- \*\*Конфиги блоков\*\*: типы блоков и их параметры описываются в `configs/blocks\_schema.json`.
+
+# 
+
+# \## Установка
+
+# 
+
+# ```bash
+
+# python -m venv .venv
+
+# .\\.venv\\Scripts\\activate          # Windows
+
+# pip install -r requirements.txt
+
+
+## Ren'Py SDK
+
+Редактор **не включает** Ren'Py, он ждёт установленный SDK.
+
+По умолчанию он ищет SDK тут (Windows):
+
+`C:\RenPy\renpy-8.3.7`
+
+Как сделать, чтобы всё заработало:
+
+1. Скачай Ren'Py SDK с https://www.renpy.org/ и распакуй в `C:\RenPy\`.
+2. Папка должна выглядеть примерно так: `C:\RenPy\renpy-8.3.7\renpy.py`, `C:\RenPy\renpy-8.3.7\lib\py3-windows-x86_64\python.exe`. [web:109][web:262]
+3. Если хочешь другой путь — измени `default_sdk_root()` в `runner/renpy_env.py` или подставь свой `RenpyEnv` в `MainWindow`.
+
+

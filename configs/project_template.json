@@ -1,0 +1,14 @@
+{
+  "name": "New RenPy Project",
+  "variables": {},
+  "scenes": [
+    {
+      "id": "scene_1",
+      "name": "Main Scene",
+      "label": "start",
+      "blocks": [],
+      "ports": [],
+      "connections": []
+    }
+  ]
+}
