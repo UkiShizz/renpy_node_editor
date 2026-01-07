@@ -8,12 +8,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType
 
 
 class BlockPropertiesPanel(QWidget):
-    """Panel for editing block properties"""
+    """Professional properties panel with modern design"""
     
     # Signal emitted when properties are saved
     properties_saved = Signal(object)  # emits Block
@@ -22,17 +23,93 @@ class BlockPropertiesPanel(QWidget):
         super().__init__(parent)
         self.current_block: Optional[Block] = None
         self._param_widgets: dict[str, QWidget] = {}
+        
+        # Применяем стиль
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #252525;
+                color: #E0E0E0;
+            }
+            QLabel {
+                color: #E0E0E0;
+                font-size: 10px;
+                padding: 2px;
+            }
+            QLineEdit {
+                background-color: #2A2A2A;
+                border: 2px solid #3A3A3A;
+                border-radius: 4px;
+                padding: 6px;
+                color: #E0E0E0;
+                font-size: 10px;
+            }
+            QLineEdit:focus {
+                border-color: #4A90E2;
+                background-color: #2F2F2F;
+            }
+            QCheckBox {
+                color: #E0E0E0;
+                font-size: 10px;
+                spacing: 6px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border: 2px solid #3A3A3A;
+                border-radius: 3px;
+                background-color: #2A2A2A;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #4A90E2;
+                border-color: #6BA3F0;
+            }
+            QPushButton {
+                background-color: #4A90E2;
+                border: none;
+                border-radius: 6px;
+                padding: 10px;
+                color: #FFFFFF;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #5BA0F2;
+            }
+            QPushButton:pressed {
+                background-color: #3A80D2;
+            }
+            QListWidget {
+                background-color: #2A2A2A;
+                border: 2px solid #3A3A3A;
+                border-radius: 4px;
+                color: #E0E0E0;
+                font-size: 10px;
+            }
+            QListWidget::item {
+                padding: 4px;
+                border-radius: 2px;
+            }
+            QListWidget::item:selected {
+                background-color: #4A90E2;
+                color: #FFFFFF;
+            }
+        """)
+        
         self.init_ui()
 
     def init_ui(self) -> None:
         """Initialize the UI"""
         self.properties_layout = QVBoxLayout()
+        self.properties_layout.setSpacing(8)
+        self.properties_layout.setContentsMargins(8, 8, 8, 8)
         
-        title = QLabel("Block Properties")
-        title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        title = QLabel("⚙️ Свойства блока")
+        title_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignCenter)
         self.properties_layout.addWidget(title)
         
-        save_button = QPushButton("Save Properties")
+        save_button = QPushButton("💾 Сохранить свойства", self)
         save_button.clicked.connect(self._on_save)
         self.properties_layout.addWidget(save_button)
         
@@ -57,43 +134,43 @@ class BlockPropertiesPanel(QWidget):
             return
         
         if self.current_block.type == BlockType.SAY:
-            self._add_text_field("who", "Character:", "")
-            self._add_text_field("text", "Text:", "")
+            self._add_text_field("who", "Персонаж:", "")
+            self._add_text_field("text", "Текст:", "")
         elif self.current_block.type == BlockType.NARRATION:
-            self._add_text_field("text", "Text:", "")
+            self._add_text_field("text", "Текст:", "")
         elif self.current_block.type == BlockType.MENU:
-            self._add_text_field("question", "Question:", "")
+            self._add_text_field("question", "Вопрос:", "")
             self._add_menu_choices()
         elif self.current_block.type == BlockType.IF:
-            self._add_text_field("condition", "Condition:", "variable == True")
+            self._add_text_field("condition", "Условие:", "variable == True")
         elif self.current_block.type == BlockType.JUMP:
-            self._add_text_field("target", "Jump to Label:", "")
+            self._add_text_field("target", "Переход на метку:", "")
         elif self.current_block.type == BlockType.CALL:
-            self._add_text_field("label", "Call Label:", "")
+            self._add_text_field("label", "Вызов метки:", "")
         elif self.current_block.type == BlockType.PAUSE:
-            self._add_text_field("duration", "Duration (seconds):", "1.0")
+            self._add_text_field("duration", "Длительность (сек):", "1.0")
         elif self.current_block.type == BlockType.TRANSITION:
-            self._add_text_field("transition", "Transition Name:", "fade")
-            self._add_text_field("duration", "Duration:", "1.0")
+            self._add_text_field("transition", "Название перехода:", "fade")
+            self._add_text_field("duration", "Длительность:", "1.0")
         elif self.current_block.type == BlockType.SOUND:
-            self._add_text_field("sound_file", "Sound File:", "")
+            self._add_text_field("sound_file", "Файл звука:", "")
         elif self.current_block.type == BlockType.MUSIC:
-            self._add_text_field("music_file", "Music File:", "")
-            self._add_checkbox("loop", "Loop music", True)
+            self._add_text_field("music_file", "Файл музыки:", "")
+            self._add_checkbox("loop", "Зациклить", True)
         elif self.current_block.type == BlockType.SET_VAR:
-            self._add_text_field("variable", "Variable Name:", "")
-            self._add_text_field("value", "Value:", "")
+            self._add_text_field("variable", "Имя переменной:", "")
+            self._add_text_field("value", "Значение:", "")
         elif self.current_block.type == BlockType.LABEL:
-            self._add_text_field("label", "Label Name:", "")
+            self._add_text_field("label", "Имя метки:", "")
         elif self.current_block.type == BlockType.SCENE:
-            self._add_text_field("background", "Background:", "black")
-            self._add_text_field("transition", "Transition (optional):", "")
+            self._add_text_field("background", "Фон:", "black")
+            self._add_text_field("transition", "Переход (опционально):", "")
         elif self.current_block.type == BlockType.SHOW:
-            self._add_text_field("character", "Character:", "")
-            self._add_text_field("expression", "Expression (optional):", "")
-            self._add_text_field("at", "At (optional):", "")
+            self._add_text_field("character", "Персонаж:", "")
+            self._add_text_field("expression", "Выражение (опционально):", "")
+            self._add_text_field("at", "Позиция (опционально):", "")
         elif self.current_block.type == BlockType.HIDE:
-            self._add_text_field("character", "Character:", "")
+            self._add_text_field("character", "Персонаж:", "")
         elif self.current_block.type == BlockType.RETURN:
             # RETURN has no parameters
             pass
@@ -121,7 +198,7 @@ class BlockPropertiesPanel(QWidget):
 
     def _add_menu_choices(self) -> None:
         """Add UI for managing menu choices"""
-        choices_label = QLabel("Menu Choices:", self)
+        choices_label = QLabel("Варианты меню:", self)
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, choices_label)
         
         # List widget для отображения вариантов
@@ -153,16 +230,47 @@ class BlockPropertiesPanel(QWidget):
         
         # Кнопки управления
         choices_buttons = QHBoxLayout()
+        choices_buttons.setSpacing(4)
         
-        add_btn = QPushButton("Add Choice", self)
+        add_btn = QPushButton("➕ Добавить", self)
+        add_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #70AD47;
+                font-size: 9px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: #8FC966;
+            }
+        """)
         add_btn.clicked.connect(lambda: self._add_menu_choice(choices_list))
         choices_buttons.addWidget(add_btn)
         
-        edit_btn = QPushButton("Edit", self)
+        edit_btn = QPushButton("✏️ Изменить", self)
+        edit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF8C00;
+                font-size: 9px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: #FFA533;
+            }
+        """)
         edit_btn.clicked.connect(lambda: self._edit_menu_choice(choices_list))
         choices_buttons.addWidget(edit_btn)
         
-        remove_btn = QPushButton("Remove", self)
+        remove_btn = QPushButton("➖ Удалить", self)
+        remove_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF6B6B;
+                font-size: 9px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: #FF8E8E;
+            }
+        """)
         remove_btn.clicked.connect(lambda: self._remove_menu_choice(choices_list))
         choices_buttons.addWidget(remove_btn)
         
@@ -174,11 +282,11 @@ class BlockPropertiesPanel(QWidget):
         """Add a new menu choice"""
         from PySide6.QtWidgets import QInputDialog
         
-        text, ok1 = QInputDialog.getText(self, "Menu Choice", "Choice text:")
+        text, ok1 = QInputDialog.getText(self, "Вариант меню", "Текст варианта:")
         if not ok1 or not text:
             return
         
-        jump, ok2 = QInputDialog.getText(self, "Menu Choice", "Jump to label (optional):")
+        jump, ok2 = QInputDialog.getText(self, "Вариант меню", "Переход на метку (опционально):")
         if not ok2:
             return
         
@@ -194,7 +302,7 @@ class BlockPropertiesPanel(QWidget):
         """Edit selected menu choice"""
         current_item = choices_list.currentItem()
         if not current_item:
-            QMessageBox.warning(self, "No Selection", "Please select a choice to edit.")
+            QMessageBox.warning(self, "Нет выбора", "Выберите вариант для редактирования.")
             return
         
         index = choices_list.row(current_item)
@@ -211,11 +319,11 @@ class BlockPropertiesPanel(QWidget):
             
             from PySide6.QtWidgets import QInputDialog
             
-            new_text, ok1 = QInputDialog.getText(self, "Edit Choice", "Choice text:", text=text)
+            new_text, ok1 = QInputDialog.getText(self, "Редактировать вариант", "Текст варианта:", text=text)
             if not ok1:
                 return
             
-            new_jump, ok2 = QInputDialog.getText(self, "Edit Choice", "Jump to label (optional):", text=jump)
+            new_jump, ok2 = QInputDialog.getText(self, "Редактировать вариант", "Переход на метку (опционально):", text=jump)
             if not ok2:
                 return
             
@@ -229,7 +337,7 @@ class BlockPropertiesPanel(QWidget):
         """Remove selected menu choice"""
         current_item = choices_list.currentItem()
         if not current_item:
-            QMessageBox.warning(self, "No Selection", "Please select a choice to remove.")
+            QMessageBox.warning(self, "Нет выбора", "Выберите вариант для удаления.")
             return
         
         index = choices_list.row(current_item)

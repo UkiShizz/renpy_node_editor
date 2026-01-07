@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, QMimeData
-from PySide6.QtGui import QDrag
+from PySide6.QtGui import QDrag, QFont, QColor
 from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
@@ -21,8 +21,8 @@ MIME_NODE_TYPE = "application/x-renpy-node-type"
 
 class BlockPalette(QListWidget):
     """
-    Список доступных типов блоков.
-    Таскаем элементы в рабочую область (NodeView/NodeScene) через drag&drop.
+    Professional block palette with modern design.
+    Drag & drop elements to the node editor.
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -31,20 +31,64 @@ class BlockPalette(QListWidget):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setDragEnabled(True)
         self.setViewMode(QListWidget.ListMode)
-        self.setSpacing(2)
+        self.setSpacing(4)
         self.setAlternatingRowColors(True)
+        
+        # Стиль палитры
+        self.setStyleSheet("""
+            QListWidget {
+                background-color: #252525;
+                border: 2px solid #3A3A3A;
+                border-radius: 8px;
+                color: #E0E0E0;
+                font-size: 11px;
+                padding: 4px;
+            }
+            QListWidget::item {
+                background-color: #2A2A2A;
+                border: 1px solid #3A3A3A;
+                border-radius: 4px;
+                padding: 8px;
+                margin: 2px;
+            }
+            QListWidget::item:hover {
+                background-color: #3A3A3A;
+                border-color: #4A90E2;
+            }
+            QListWidget::item:selected {
+                background-color: #4A90E2;
+                border-color: #6BA3F0;
+                color: #FFFFFF;
+            }
+        """)
 
         self._populate_items()
 
     def _populate_items(self) -> None:
-        """
-        Забиваем палитру базовыми типами из BlockType.
-        Потом можно будет грузить из configs/blocks_schema.json.
-        """
-        for block_type in BlockType:
-            item = QListWidgetItem(block_type.name)
-            item.setData(Qt.UserRole, block_type.name)
-            self.addItem(item)
+        """Заполнить палитру типами блоков с группировкой"""
+        # Группируем блоки по категориям
+        categories = {
+            "Диалоги": [BlockType.SAY, BlockType.NARRATION],
+            "Визуальные": [BlockType.SCENE, BlockType.SHOW, BlockType.HIDE],
+            "Логика": [BlockType.IF, BlockType.MENU, BlockType.JUMP, BlockType.CALL, BlockType.LABEL],
+            "Эффекты": [BlockType.PAUSE, BlockType.TRANSITION, BlockType.SOUND, BlockType.MUSIC],
+            "Данные": [BlockType.SET_VAR, BlockType.RETURN],
+        }
+        
+        for category, block_types in categories.items():
+            # Заголовок категории
+            header = QListWidgetItem(f"━━━ {category} ━━━")
+            header.setFlags(Qt.NoItemFlags)  # Не выбирается
+            header.setForeground(QColor("#888888"))
+            font = QFont("Segoe UI", 9, QFont.Weight.Bold)
+            header.setFont(font)
+            self.addItem(header)
+            
+            # Блоки категории
+            for block_type in block_types:
+                item = QListWidgetItem(f"  • {block_type.name}")
+                item.setData(Qt.UserRole, block_type.name)
+                self.addItem(item)
 
     # ---- drag&drop ----
 
@@ -58,7 +102,6 @@ class BlockPalette(QListWidget):
             return
 
         mime_data = QMimeData()
-        # просто кладём имя типа как байты
         mime_data.setData(MIME_NODE_TYPE, str(block_type_name).encode("utf-8"))
 
         drag = QDrag(self)
@@ -68,8 +111,7 @@ class BlockPalette(QListWidget):
 
 class BlockPalettePanel(QWidget):
     """
-    Обёртка с заголовком, если захочешь вынести палитру отдельно.
-    Сейчас в MainWindow используется напрямую BlockPalette.
+    Обёртка с заголовком для палитры блоков.
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:

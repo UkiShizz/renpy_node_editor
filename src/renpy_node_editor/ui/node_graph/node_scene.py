@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import QRectF, Qt, QPointF, Signal
-from PySide6.QtGui import QPainter, QPen, QColor
+from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent
 
 from renpy_node_editor.core.model import Project, Scene, Block, BlockType
@@ -13,17 +13,16 @@ from renpy_node_editor.ui.node_graph.port_item import PortItem
 from renpy_node_editor.ui.node_graph.connection_item import ConnectionItem
 
 
-GRID_SMALL = 16
-GRID_BIG = 64
+GRID_SMALL = 20
+GRID_BIG = 100
 
 
 class NodeScene(QGraphicsScene):
     """
-    Scene of node editor:
-    - draws grid
-    - stores NodeItem's
-    - accepts drag&drop from BlockPalette
-    - supports creating connections with mouse
+    Professional node editor scene:
+    - modern grid design
+    - better background
+    - smooth visuals
     """
     
     # Signal emitted when a node is selected/deselected
@@ -35,7 +34,8 @@ class NodeScene(QGraphicsScene):
         self._project: Optional[Project] = None
         self._scene_model: Optional[Scene] = None
 
-        self.setBackgroundBrush(QColor("#202020"))
+        # Современная темная тема
+        self.setBackgroundBrush(QColor("#1E1E1E"))
         self.setItemIndexMethod(QGraphicsScene.NoIndex)
         self.setSceneRect(-5000, -5000, 10000, 10000)
 
@@ -65,10 +65,13 @@ class NodeScene(QGraphicsScene):
     def drawBackground(self, painter: QPainter, rect: QRectF) -> None:  # type: ignore[override]
         super().drawBackground(painter, rect)
 
+        painter.setRenderHint(QPainter.Antialiasing, False)
+
+        # Мелкая сетка
         left = int(rect.left()) - (int(rect.left()) % GRID_SMALL)
         top = int(rect.top()) - (int(rect.top()) % GRID_SMALL)
 
-        painter.setPen(QPen(QColor("#303030"), 1))
+        painter.setPen(QPen(QColor("#2A2A2A"), 1))
         x = left
         while x < rect.right():
             painter.drawLine(x, rect.top(), x, rect.bottom())
@@ -79,7 +82,8 @@ class NodeScene(QGraphicsScene):
             painter.drawLine(rect.left(), y, rect.right(), y)
             y += GRID_SMALL
 
-        painter.setPen(QPen(QColor("#404040"), 1))
+        # Крупная сетка
+        painter.setPen(QPen(QColor("#333333"), 1.5))
         left_big = int(rect.left()) - (int(rect.left()) % GRID_BIG)
         top_big = int(rect.top()) - (int(rect.top()) % GRID_BIG)
 

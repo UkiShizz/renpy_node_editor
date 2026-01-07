@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF
-from PySide6.QtGui import QPainterPath, QPen, QColor
+from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter
 from PySide6.QtWidgets import QGraphicsPathItem
 
 
 class ConnectionItem(QGraphicsPathItem):
     """
-    Visualrepresentation of connection between ports:
-    - drawn as cubic Bezier curve between two points
-    - can be temporary (second end follows mouse) or permanent
+    Professional connection visualization:
+    - smooth bezier curves
+    - gradient colors
+    - better line style
     """
 
     def __init__(self, src_port, dst_port=None, parent=None):
@@ -19,7 +20,12 @@ class ConnectionItem(QGraphicsPathItem):
         self.dst_port = dst_port
 
         self.setZValue(-1)
-        self.setPen(QPen(QColor("#c0c0c0"), 2))
+        
+        # Более яркая и толстая линия
+        self._pen = QPen(QColor("#A0A0A0"), 3)
+        self._pen.setCapStyle(QPen.RoundCap)
+        self._pen.setJoinStyle(QPen.RoundJoin)
+        self.setPen(self._pen)
 
         self._tmp_end = None
 
@@ -35,9 +41,13 @@ class ConnectionItem(QGraphicsPathItem):
         self.dst_port = port
         self._tmp_end = None
         self.update_path()
+        
+        # Меняем цвет на более яркий при установке связи
+        self._pen.setColor(QColor("#C0C0C0"))
+        self.setPen(self._pen)
 
     def update_path(self):
-        """Redraw curve between ports"""
+        """Redraw smooth curve between ports"""
         if not self.src_port:
             return
 
@@ -50,13 +60,30 @@ class ConnectionItem(QGraphicsPathItem):
         else:
             p2 = p1
 
-        dx = (p2.x() - p1.x()) * 0.5
+        # Более плавные кривые
+        dx = abs(p2.x() - p1.x()) * 0.6
+        if dx < 50:
+            dx = 50
+        
         c1 = QPointF(p1.x() + dx, p1.y())
         c2 = QPointF(p2.x() - dx, p2.y())
 
         path = QPainterPath(p1)
         path.cubicTo(c1, c2, p2)
         self.setPath(path)
+
+    def paint(self, painter: QPainter, option, widget=None) -> None:
+        """Кастомная отрисовка с эффектом свечения"""
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        
+        # Рисуем тень
+        shadow_pen = QPen(QColor(0, 0, 0, 40), 5)
+        shadow_pen.setCapStyle(QPen.RoundCap)
+        painter.setPen(shadow_pen)
+        painter.drawPath(self.path())
+        
+        # Основная линия
+        super().paint(painter, option, widget)
 
     def detach_from(self, port):
         """Detach wire from port (when deleting)"""

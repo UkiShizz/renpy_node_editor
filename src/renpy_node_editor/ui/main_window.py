@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLabel,
 )
+from PySide6.QtGui import QFont
 
 from renpy_node_editor.app_controller import EditorController
 from renpy_node_editor.core.model import Scene
@@ -28,7 +29,7 @@ from renpy_node_editor.ui.block_properties_panel import BlockPropertiesPanel
 
 class MainWindow(QMainWindow):
     """
-    Главное окно редактора:
+    Главное окно редактора с современным дизайном:
     - слева: нод-редактор (NodeView/NodeScene)
     - справа: палитра блоков + панель превью кода
     - сверху: кнопки управления проектом
@@ -42,28 +43,72 @@ class MainWindow(QMainWindow):
         self._renpy_env: Optional[RenpyEnv] = default_env()
 
         self.setWindowTitle("RenPy Node Editor")
-        self.resize(1200, 700)
+        self.resize(1400, 800)
+        
+        # Применяем темную тему
+        self._apply_style()
 
         self._build_ui()
         self._update_window_title()
+
+    def _apply_style(self) -> None:
+        """Применить современный стиль к окну"""
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1E1E1E;
+            }
+            QWidget {
+                background-color: #1E1E1E;
+                color: #E0E0E0;
+            }
+            QPushButton {
+                background-color: #3A3A3A;
+                border: 2px solid #4A4A4A;
+                border-radius: 6px;
+                padding: 8px 16px;
+                color: #E0E0E0;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+                border-color: #5A5A5A;
+            }
+            QPushButton:pressed {
+                background-color: #2A2A2A;
+            }
+            QLabel {
+                color: #E0E0E0;
+            }
+            QSplitter::handle {
+                background-color: #2A2A2A;
+            }
+            QSplitter::handle:horizontal {
+                width: 3px;
+            }
+            QSplitter::handle:vertical {
+                height: 3px;
+            }
+        """)
 
     # ---- UI ----
 
     def _build_ui(self) -> None:
         central = QWidget(self)
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(4, 4, 4, 4)
-        main_layout.setSpacing(4)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
 
         # Верхняя панель кнопок
         top_bar = QHBoxLayout()
+        top_bar.setSpacing(8)
         main_layout.addLayout(top_bar)
 
-        btn_new = QPushButton("Новый проект", self)
-        btn_open = QPushButton("Открыть", self)
-        btn_save = QPushButton("Сохранить", self)
-        btn_generate = QPushButton("Сгенерировать код", self)
-        btn_run = QPushButton("Запустить в Ren'Py", self)
+        btn_new = QPushButton("📁 Новый проект", self)
+        btn_open = QPushButton("📂 Открыть", self)
+        btn_save = QPushButton("💾 Сохранить", self)
+        btn_generate = QPushButton("⚙️ Сгенерировать код", self)
+        btn_run = QPushButton("▶️ Запустить в Ren'Py", self)
 
         btn_new.clicked.connect(self._on_new_project)
         btn_open.clicked.connect(self._on_open_project)
@@ -93,22 +138,24 @@ class MainWindow(QMainWindow):
         # Правая часть — палитра + превью кода
         right_container = QWidget(self)
         right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(4, 0, 0, 0)
-        right_layout.setSpacing(4)
+        right_layout.setContentsMargins(8, 0, 0, 0)
+        right_layout.setSpacing(8)
 
         # Палитра блоков
-        palette_label = QLabel("Блоки", self)
+        palette_label = QLabel("📦 Блоки", self)
         palette_label.setAlignment(Qt.AlignCenter)
+        palette_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
+        palette_label.setFont(palette_font)
         right_layout.addWidget(palette_label)
 
         self.block_palette = BlockPalette(self)
         right_layout.addWidget(self.block_palette, 1)
 
-        # Превью кода (PreviewPanel вместо QTextEdit)
+        # Превью кода
         self.preview_panel = PreviewPanel(self)
         right_layout.addWidget(self.preview_panel, 1)
         
-        # Панель свойств блока (BlockPropertiesPanel)
+        # Панель свойств блока
         self.properties_panel = BlockPropertiesPanel(self)
         right_layout.addWidget(self.properties_panel, 1)
 
@@ -139,7 +186,6 @@ class MainWindow(QMainWindow):
         if not base_dir:
             return
 
-        # getText в PySide6 живёт в QInputDialog, но ради простоты можно сделать отдельный диалог позже
         from PySide6.QtWidgets import QInputDialog
 
         name, ok = QInputDialog.getText(self, "Имя проекта", "Имя проекта:")
@@ -252,4 +298,3 @@ class MainWindow(QMainWindow):
             if hasattr(item, 'block') and item.block.id == block.id:
                 item.update_display()
                 break
-
