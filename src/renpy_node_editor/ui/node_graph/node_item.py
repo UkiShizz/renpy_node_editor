@@ -1,33 +1,33 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
-from PySide6.QtCore import QRectF, QPointF, Qt
-from PySide6.QtGui import QBrush, QColor, QPen, QPainter
-from PySide6.QtWidgets import QGraphicsItem
+from PySide6.QtCore import QRectF
+from PySide6.QtGui import QBrush, QColor, QPen
+from PySide6.QtWidgets import QGraphicsItem, QGraphicsRectItem, QGraphicsTextItem
 
 from renpy_node_editor.core.model import Block
+from renpy_node_editor.ui.node_graph.port_item import PortItem
 
 
-class NodeItem(QGraphicsItem):
+class NodeItem(QGraphicsRectItem):
     """
-    Визуальная нода (блок) в редакторе.
-    Пока: прямоугольник с заголовком, который можно таскать.
-    Порты и провода прикрутим отдельными PortItem/EdgeItem.
+    Visual representation of block (Block):
+    - rectangle with title
+    - input/output ports on sides
     """
 
-    WIDTH = 160.0
-    HEIGHT = 80.0
-    TITLE_HEIGHT = 20.0
-    RADIUS = 4.0
+    WIDTH = 140
+    HEIGHT = 60
 
     def __init__(self, block: Block, parent: Optional[QGraphicsItem] = None) -> None:
         super().__init__(parent)
 
-        self.block = block  # ссылка на модель
+        self.block = block
 
-        # позиции берём из модели
-        self.setPos(QPointF(block.x, block.y))
+        self.setRect(QRectF(0, 0, self.WIDTH, self.HEIGHT))
+        self.setBrush(QBrush(QColor("#333333")))
+        self.setPen(QPen(QColor("#666666"), 1.5))
 
         self.setFlags(
             QGraphicsItem.ItemIsMovable
@@ -35,73 +35,42 @@ class NodeItem(QGraphicsItem):
             | QGraphicsItem.ItemSendsGeometryChanges
         )
 
-    # ---- геометрия ----
+        self.setPos(block.x, block.y)
 
-    def boundingRect(self) -> QRectF:  # type: ignore[override]
-        margin = 1.0
-        return QRectF(
-            -margin,
-            -margin,
-            self.WIDTH + margin * 2,
-            self.HEIGHT + margin * 2,
-        )
+        self._title_item = QGraphicsTextItem(block.type.name, self)
+        self._title_item.setDefaultTextColor(QColor("#ffffff"))
+        self._title_item.setPos(6, 4)
 
-    # ---- отрисовка ----
+        self.inputs: List[PortItem] = []
+        self.outputs: List[PortItem] = []
 
-    def paint(  # type: ignore[override]
-        self,
-        painter: QPainter,
-        option,
-        widget=None,
-    ) -> None:
-        rect = QRectF(0, 0, self.WIDTH, self.HEIGHT)
-        title_rect = QRectF(0, 0, self.WIDTH, self.TITLE_HEIGHT)
+        self._create_ports()
 
-        # фон
-        body_color = QColor("#303030")
-        title_color = QColor("#505050")
-        border_color = QColor("#AAAAAA")
-        if self.isSelected():
-            border_color = QColor("#FFD700")
+    def _create_ports(self) -> None:
+        """Create input port on left and output port on right"""
 
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        in_port = PortItem(parent=self, is_output=False, name="in")
+        in_port.setPos(0, self.HEIGHT / 2)
+        self.inputs.append(in_port)
 
-        # тело
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(body_color))
-        painter.drawRoundedRect(rect, self.RADIUS, self.RADIUS)
+        out_port = PortItem(parent=self, is_output=True, name="out")
+        out_port.setPos(self.WIDTH, self.HEIGHT / 2)
+        self.outputs.append(out_port)
 
-        # заголовок
-        painter.setBrush(QBrush(title_color))
-        painter.drawRoundedRect(
-            QRectF(rect.x(), rect.y(), rect.width(), self.TITLE_HEIGHT),
-            self.RADIUS,
-            self.RADIUS,
-        )
-
-        # граница
-        pen = QPen(border_color)
-        pen.setWidthF(1.5)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(rect, self.RADIUS, self.RADIUS)
-
-        # текст заголовка: тип блока
-        painter.setPen(QColor("#FFFFFF"))
-        title = self.block.type.name
-        painter.drawText(
-            title_rect.adjusted(4, 0, -4, 0),
-            Qt.AlignVCenter | Qt.AlignLeft,
-            title,
-        )
-
-    # ---- синхронизация с моделью ----
-
-    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):  # type: ignore[override]
+    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
         if change == QGraphicsItem.ItemPositionHasChanged:
-            pos = self.pos()
-            # обновляем позицию блока в модели
-            self.block.x = pos.x()
-            self.block.y = pos.y()
-            # тут же позже будем уведомлять сцену, чтобы она обновляла EdgeItem'ы
+            for p in self.inputs + self.outputs:
+                for c in p.connections:
+                    c.update_path()
+
+            self.block.x = self.pos().x()
+            self.block.y = self.pos().y()
+
         return super().itemChange(change, value)
+
+    def setSelected(self, selected: bool) -> None:  # type: ignore[override]
+        super().setSelected(selected)
+        if selected:
+            self.setPen(QPen(QColor("#ffaa00"), 2))
+        else:
+            self.setPen(QPen(QColor("#666666"), 1.5))
