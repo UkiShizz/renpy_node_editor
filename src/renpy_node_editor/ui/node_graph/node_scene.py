@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import QRectF, Qt, QPointF, pyqtSignal
+from PySide6.QtCore import QRectF, Qt, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QColor
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent
 
@@ -27,7 +27,7 @@ class NodeScene(QGraphicsScene):
     """
     
     # Signal emitted when a node is selected/deselected
-    node_selection_changed = pyqtSignal(object)  # emits Block or None
+    node_selection_changed = Signal(object)  # emits Block or None
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)

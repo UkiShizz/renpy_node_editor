@@ -86,10 +86,6 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(0)
 
         self.node_view = NodeView(self)
-        # Connect node selection to properties panel
-        self.node_view.node_scene.node_selection_changed.connect(
-            self.properties_panel.set_block
-        )
         left_layout.addWidget(self.node_view)
 
         splitter.addWidget(left_container)
@@ -117,6 +113,13 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.properties_panel, 1)
 
         splitter.addWidget(right_container)
+        
+        # Connect node selection to properties panel (after both are created)
+        self.node_view.node_scene.node_selection_changed.connect(
+            self.properties_panel.set_block
+        )
+        # Connect properties saved signal to update node display
+        self.properties_panel.properties_saved.connect(self._on_properties_saved)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
 
@@ -240,4 +243,13 @@ class MainWindow(QMainWindow):
             "Запуск",
             f"Игра запущена через Ren'Py.\nscript.rpy: {script_path}",
         )
+    
+    def _on_properties_saved(self, block) -> None:
+        """Handle properties saved - update the visual representation"""
+        scene = self.node_view.node_scene
+        # Find the NodeItem for this block and update its display
+        for item in scene.items():
+            if hasattr(item, 'block') and item.block.id == block.id:
+                item.update_display()
+                break
 
