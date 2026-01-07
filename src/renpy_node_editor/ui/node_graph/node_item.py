@@ -25,6 +25,10 @@ class NodeItem(QGraphicsRectItem):
 
         self.block = block
 
+        # ВАЖНО: инициализируем inputs и outputs ДО setPos(), т.к. setPos() триггерит itemChange()
+        self.inputs: List[PortItem] = []
+        self.outputs: List[PortItem] = []
+
         self.setRect(QRectF(0, 0, self.WIDTH, self.HEIGHT))
         self.setBrush(QBrush(QColor("#333333")))
         self.setPen(QPen(QColor("#666666"), 1.5))
@@ -35,14 +39,12 @@ class NodeItem(QGraphicsRectItem):
             | QGraphicsItem.ItemSendsGeometryChanges
         )
 
+        # Только ПОСЛЕ инициализации атрибутов вызываем setPos
         self.setPos(block.x, block.y)
 
         self._title_item = QGraphicsTextItem(block.type.name, self)
         self._title_item.setDefaultTextColor(QColor("#ffffff"))
         self._title_item.setPos(6, 4)
-
-        self.inputs: List[PortItem] = []
-        self.outputs: List[PortItem] = []
 
         self._create_ports()
 
@@ -59,6 +61,7 @@ class NodeItem(QGraphicsRectItem):
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
         if change == QGraphicsItem.ItemPositionHasChanged:
+            # обновляем все провода при движении ноды
             for p in self.inputs + self.outputs:
                 for c in p.connections:
                     c.update_path()
