@@ -238,18 +238,35 @@ class MainWindow(QMainWindow):
     def _load_project(self, project: Project, scene: Scene) -> None:
         """Загрузить проект и сцену в UI"""
         try:
-            self.scene_manager.set_project(project)
-            self.scene_manager.set_current_scene(scene)
-            self.node_view.set_project_and_scene(project, scene)
-            self.preview_panel.clear()
-            self._update_window_title()
+            # Временно отключаем сигналы чтобы избежать проблем во время переключения
+            if hasattr(self.node_view, 'node_scene'):
+                self.node_view.node_scene.blockSignals(True)
+            
+            try:
+                self.scene_manager.set_project(project)
+                self.scene_manager.set_current_scene(scene)
+                self.node_view.set_project_and_scene(project, scene)
+                self.preview_panel.clear()
+                self._update_window_title()
+            finally:
+                # Восстанавливаем сигналы
+                if hasattr(self.node_view, 'node_scene'):
+                    self.node_view.node_scene.blockSignals(False)
         except Exception as e:
             import traceback
+            error_msg = f"Не удалось загрузить проект:\n{str(e)}\n\n{traceback.format_exc()}"
+            print(error_msg)  # Также выводим в консоль
             QMessageBox.critical(
                 self,
                 "Ошибка загрузки проекта",
-                f"Не удалось загрузить проект:\n{str(e)}\n\n{traceback.format_exc()}"
+                error_msg
             )
+            # Восстанавливаем сигналы даже при ошибке
+            try:
+                if hasattr(self.node_view, 'node_scene'):
+                    self.node_view.node_scene.blockSignals(False)
+            except Exception:
+                pass
 
     def _update_window_title(self) -> None:
         name = self._controller.get_project_name()
@@ -414,14 +431,33 @@ class MainWindow(QMainWindow):
     
     def _on_properties_saved(self, block) -> None:
         """Handle properties saved - update the visual representation"""
-        from renpy_node_editor.ui.node_graph.node_item import NodeItem
+        if not block:
+            return
         
-        scene = self.node_view.node_scene
-        # Find the NodeItem for this block and update its display
-        for item in scene.items():
-            if isinstance(item, NodeItem) and item.block.id == block.id:
-                item.update_display()
-                break
+        try:
+            from renpy_node_editor.ui.node_graph.node_item import NodeItem
+            
+            scene = self.node_view.node_scene
+            if not scene or not scene._scene_model:
+                return
+            
+            # Проверяем, что блок еще существует в текущей сцене
+            if not scene._scene_model.find_block(block.id):
+                return
+            
+            # Find the NodeItem for this block and update its display
+            for item in scene.items():
+                if isinstance(item, NodeItem):
+                    # Проверяем, что элемент еще в сцене
+                    if not item.scene():
+                        continue
+                    if item.block.id == block.id:
+                        item.update_display()
+                        break
+        except Exception as e:
+            import traceback
+            print(f"Error in _on_properties_saved: {e}")
+            print(traceback.format_exc())
     
     def _on_center_view(self) -> None:
         """Вернуться в центр рабочей области"""

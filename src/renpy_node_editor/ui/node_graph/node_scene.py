@@ -54,6 +54,8 @@ class NodeScene(QGraphicsScene):
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
+        # Блокируем сигналы во время перезагрузки, чтобы избежать проблем
+        self.blockSignals(True)
         try:
             # Очищаем состояние перетаскивания перед очисткой сцены
             if self._drag_connection:
@@ -65,7 +67,16 @@ class NodeScene(QGraphicsScene):
             self._drag_src_port = None
             
             # Очищаем сцену перед загрузкой новой
+            # Временно отключаем сигнал selectionChanged чтобы избежать проблем
+            try:
+                self.selectionChanged.disconnect()
+            except Exception:
+                pass
+            
             self.clear()
+            
+            # Восстанавливаем сигнал selectionChanged
+            self.selectionChanged.connect(self._on_selection_changed)
             
             # Устанавливаем новую модель
             self._project = project
@@ -91,11 +102,22 @@ class NodeScene(QGraphicsScene):
                         pass
                     self._drag_connection = None
                 self._drag_src_port = None
+                try:
+                    self.selectionChanged.disconnect()
+                except Exception:
+                    pass
                 self.clear()
+                try:
+                    self.selectionChanged.connect(self._on_selection_changed)
+                except Exception:
+                    pass
                 self._project = project
                 self._scene_model = scene
-            except Exception:
-                pass
+            except Exception as e2:
+                print(f"Error in recovery: {e2}")
+        finally:
+            # Разблокируем сигналы
+            self.blockSignals(False)
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
         item = NodeItem(block)
@@ -368,16 +390,40 @@ class NodeScene(QGraphicsScene):
     
     def _on_selection_changed(self) -> None:
         """Handle selection changes and emit signal with selected block"""
-        selected_items = self.selectedItems()
-        if selected_items:
-            # Get the first selected item
-            item = selected_items[0]
-            if isinstance(item, NodeItem):
-                self.node_selection_changed.emit(item.block)
+        try:
+            # Проверяем, что сцена еще существует
+            if not self._scene_model:
+                self.node_selection_changed.emit(None)
+                return
+            
+            selected_items = self.selectedItems()
+            if selected_items:
+                # Get the first selected item
+                item = selected_items[0]
+                # Проверяем, что элемент еще в сцене
+                if not item.scene():
+                    self.node_selection_changed.emit(None)
+                    return
+                
+                if isinstance(item, NodeItem):
+                    # Проверяем, что блок еще существует в модели
+                    if self._scene_model.find_block(item.block.id):
+                        self.node_selection_changed.emit(item.block)
+                    else:
+                        self.node_selection_changed.emit(None)
+                else:
+                    self.node_selection_changed.emit(None)
             else:
                 self.node_selection_changed.emit(None)
-        else:
-            self.node_selection_changed.emit(None)
+        except Exception as e:
+            # В случае ошибки просто эмитим None
+            import traceback
+            print(f"Error in _on_selection_changed: {e}")
+            print(traceback.format_exc())
+            try:
+                self.node_selection_changed.emit(None)
+            except Exception:
+                pass
     
     # ---- deletion ----
     
