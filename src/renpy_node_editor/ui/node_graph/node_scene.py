@@ -4,11 +4,13 @@ from typing import Optional
 
 from PySide6.QtCore import QRectF, Qt, QPointF
 from PySide6.QtGui import QPainter, QPen, QColor
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent
 
 from renpy_node_editor.core.model import Project, Scene, Block, BlockType
 from renpy_node_editor.ui.block_palette import MIME_NODE_TYPE
 from renpy_node_editor.ui.node_graph.node_item import NodeItem
+from renpy_node_editor.ui.node_graph.port_item import PortItem
+from renpy_node_editor.ui.node_graph.connection_item import ConnectionItem
 
 
 GRID_SMALL = 16
@@ -17,10 +19,11 @@ GRID_BIG = 64
 
 class NodeScene(QGraphicsScene):
     """
-    Сцена нодового редактора:
-    - рисует сетку
-    - хранит NodeItem'ы
-    - принимает drag&drop из BlockPalette
+    Scene of node editor:
+    - draws grid
+    - stores NodeItem's
+    - accepts drag&drop from BlockPalette
+    - supports creating connections with mouse
     """
 
     def __init__(self, parent=None) -> None:
@@ -33,7 +36,10 @@ class NodeScene(QGraphicsScene):
         self.setItemIndexMethod(QGraphicsScene.NoIndex)
         self.setSceneRect(-5000, -5000, 10000, 10000)
 
-    # ---- привязка к модели ----
+        self._drag_connection: Optional[ConnectionItem] = None
+        self._drag_src_port: Optional[PortItem] = None
+
+    # ---- binding to model ----
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         self.clear()
@@ -48,7 +54,7 @@ class NodeScene(QGraphicsScene):
         self.addItem(item)
         return item
 
-    # ---- сетка ----
+    # ---- grid ----
 
     def drawBackground(self, painter: QPainter, rect: QRectF) -> None:  # type: ignore[override]
         super().drawBackground(painter, rect)
@@ -81,7 +87,7 @@ class NodeScene(QGraphicsScene):
             painter.drawLine(rect.left(), y, rect.right(), y)
             y += GRID_BIG
 
-    # ---- drag&drop из палитры ----
+    # ---- drag&drop from palette ----
 
     def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent) -> None:  # type: ignore[override]
         mime = event.mimeData()
@@ -98,8 +104,6 @@ class NodeScene(QGraphicsScene):
             event.ignore()
 
     def dropEvent(self, event: QGraphicsSceneDragDropEvent) -> None:  # type: ignore[override]
-        print("DROP EVENT", event.scenePos())  # временно для дебага
-
         mime = event.mimeData()
         if not mime.hasFormat(MIME_NODE_TYPE):
             event.ignore()
@@ -136,4 +140,47 @@ class NodeScene(QGraphicsScene):
         self._create_node_item_for_block(block)
 
         event.acceptProposedAction()
-        print("DROP OK", block_type_name, pos)
+
+    # ---- connections with mouse ----
+
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # type: ignore[override]
+        view = self.views()[0] if self.views() else None
+        item = self.itemAt(event.scenePos(), view.transform()) if view else None
+
+        if event.button() == Qt.LeftButton and isinstance(item, PortItem) and item.is_output:
+            self._drag_src_port = item
+            self._drag_connection = ConnectionItem(src_port=item)
+            self.addItem(self._drag_connection)
+            self._drag_connection.set_tmp_end(event.scenePos())
+            event.accept()
+            return
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # type: ignore[override]
+        if self._drag_connection is not None:
+            self._drag_connection.set_tmp_end(event.scenePos())
+            event.accept()
+            return
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # type: ignore[override]
+        if self._drag_connection is not None and self._drag_src_port is not None:
+            view = self.views()[0] if self.views() else None
+            item = self.itemAt(event.scenePos(), view.transform()) if view else None
+
+            if isinstance(item, PortItem) and not item.is_output:
+                self._drag_connection.set_dst_port(item)
+                self._drag_src_port.add_connection(self._drag_connection)
+                item.add_connection(self._drag_connection)
+            else:
+                self.removeItem(self._drag_connection)
+                del self._drag_connection
+
+            self._drag_connection = None
+            self._drag_src_port = None
+            event.accept()
+            return
+
+        super().mouseReleaseEvent(event)
