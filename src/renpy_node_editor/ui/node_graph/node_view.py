@@ -48,6 +48,10 @@ class NodeView(QGraphicsView):
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         self._scene.set_project_and_scene(project, scene)
+    
+    def center_view(self) -> None:
+        """Вернуться в центр рабочей области"""
+        self.centerOn(0, 0)
 
     # ---- зум ----
 

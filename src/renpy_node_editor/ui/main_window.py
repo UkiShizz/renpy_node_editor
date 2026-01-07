@@ -25,6 +25,7 @@ from renpy_node_editor.ui.block_palette import BlockPalette
 from renpy_node_editor.ui.node_graph.node_view import NodeView
 from renpy_node_editor.ui.preview_panel import PreviewPanel
 from renpy_node_editor.ui.block_properties_panel import BlockPropertiesPanel
+from renpy_node_editor.ui.scene_manager_panel import SceneManagerPanel
 
 
 class MainWindow(QMainWindow):
@@ -110,6 +111,8 @@ class MainWindow(QMainWindow):
         btn_generate = QPushButton("⚙️ Сгенерировать код", self)
         btn_export = QPushButton("📤 Экспорт в .rpy", self)
         btn_run = QPushButton("▶️ Запустить в Ren'Py", self)
+        btn_center = QPushButton("🎯 Центр", self)
+        btn_center.setToolTip("Вернуться в центр рабочей области")
 
         btn_new.clicked.connect(self._on_new_project)
         btn_open.clicked.connect(self._on_open_project)
@@ -117,8 +120,9 @@ class MainWindow(QMainWindow):
         btn_generate.clicked.connect(self._on_generate_code)
         btn_export.clicked.connect(self._on_export_rpy)
         btn_run.clicked.connect(self._on_run_project)
+        btn_center.clicked.connect(self._on_center_view)
 
-        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_run):
+        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_run, btn_center):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
@@ -142,6 +146,11 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout(right_container)
         right_layout.setContentsMargins(8, 0, 0, 0)
         right_layout.setSpacing(8)
+
+        # Панель управления сценами
+        self.scene_manager = SceneManagerPanel(self)
+        self.scene_manager.scene_selected.connect(self._on_scene_selected)
+        right_layout.addWidget(self.scene_manager, 0)
 
         # Палитра блоков
         palette_label = QLabel("📦 Блоки", self)
@@ -204,6 +213,8 @@ class MainWindow(QMainWindow):
         else:
             scene = project.scenes[0]
 
+        self.scene_manager.set_project(project)
+        self.scene_manager.set_current_scene(scene)
         self.node_view.set_project_and_scene(project, scene)
         self.preview_panel.clear()
         self._update_window_title()
@@ -237,6 +248,8 @@ class MainWindow(QMainWindow):
             return
 
         scene = project.scenes[0]  # пока просто первая
+        self.scene_manager.set_project(project)
+        self.scene_manager.set_current_scene(scene)
         self.node_view.set_project_and_scene(project, scene)
         self.preview_panel.clear()
         self._update_window_title()
@@ -341,3 +354,16 @@ class MainWindow(QMainWindow):
             if hasattr(item, 'block') and item.block.id == block.id:
                 item.update_display()
                 break
+    
+    def _on_center_view(self) -> None:
+        """Вернуться в центр рабочей области"""
+        self.node_view.center_view()
+    
+    def _on_scene_selected(self, scene: Scene) -> None:
+        """Обработка выбора сцены"""
+        if not self._controller.project:
+            return
+        
+        self.scene_manager.set_current_scene(scene)
+        self.node_view.set_project_and_scene(self._controller.project, scene)
+        self.preview_panel.clear()

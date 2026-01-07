@@ -34,10 +34,11 @@ class NodeScene(QGraphicsScene):
         self._project: Optional[Project] = None
         self._scene_model: Optional[Scene] = None
 
-        # Современная темная тема
+        # Современная темная тема с бесконечной областью
         self.setBackgroundBrush(QColor("#1E1E1E"))
         self.setItemIndexMethod(QGraphicsScene.NoIndex)
-        self.setSceneRect(-5000, -5000, 10000, 10000)
+        # Бесконечная рабочая область (очень большой размер)
+        self.setSceneRect(-100000, -100000, 200000, 200000)
 
         self._drag_connection: Optional[ConnectionItem] = None
         self._drag_src_port: Optional[PortItem] = None
@@ -67,11 +68,11 @@ class NodeScene(QGraphicsScene):
 
         painter.setRenderHint(QPainter.Antialiasing, False)
 
-        # Мелкая сетка
+        # Мелкая сетка (более заметная)
         left = int(rect.left()) - (int(rect.left()) % GRID_SMALL)
         top = int(rect.top()) - (int(rect.top()) % GRID_SMALL)
 
-        painter.setPen(QPen(QColor("#2A2A2A"), 1))
+        painter.setPen(QPen(QColor("#2F2F2F"), 1))
         x = left
         while x < rect.right():
             painter.drawLine(x, rect.top(), x, rect.bottom())
@@ -82,8 +83,8 @@ class NodeScene(QGraphicsScene):
             painter.drawLine(rect.left(), y, rect.right(), y)
             y += GRID_SMALL
 
-        # Крупная сетка
-        painter.setPen(QPen(QColor("#333333"), 1.5))
+        # Крупная сетка (более заметная)
+        painter.setPen(QPen(QColor("#3A3A3A"), 2))
         left_big = int(rect.left()) - (int(rect.left()) % GRID_BIG)
         top_big = int(rect.top()) - (int(rect.top()) % GRID_BIG)
 
@@ -96,6 +97,13 @@ class NodeScene(QGraphicsScene):
         while y < rect.bottom():
             painter.drawLine(rect.left(), y, rect.right(), y)
             y += GRID_BIG
+        
+        # Центральные линии (еще более заметные)
+        painter.setPen(QPen(QColor("#4A4A4A"), 2.5))
+        if abs(left_big) < GRID_BIG * 2:  # Рисуем только если близко к центру
+            painter.drawLine(0, rect.top(), 0, rect.bottom())
+        if abs(top_big) < GRID_BIG * 2:
+            painter.drawLine(rect.left(), 0, rect.right(), 0)
 
     # ---- drag&drop from palette ----
 
