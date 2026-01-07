@@ -102,6 +102,25 @@ class EditorController:
             return ""
 
         return generate_renpy_script(self._state.current_project)
+    
+    def export_to_rpy(self, file_path: Path) -> None:
+        """
+        Экспортировать сгенерированный код в .rpy файл.
+        
+        Args:
+            file_path: Путь к файлу для сохранения
+        """
+        if not self._state.current_project:
+            raise ValueError("Нет открытого проекта")
+        
+        code = generate_renpy_script(self._state.current_project)
+        
+        # Создаем директорию если нужно
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Сохраняем файл
+        with file_path.open("w", encoding="utf-8") as f:
+            f.write(code)
 
     # ---- удобняшки ----
 

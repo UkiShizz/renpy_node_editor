@@ -108,15 +108,17 @@ class MainWindow(QMainWindow):
         btn_open = QPushButton("📂 Открыть", self)
         btn_save = QPushButton("💾 Сохранить", self)
         btn_generate = QPushButton("⚙️ Сгенерировать код", self)
+        btn_export = QPushButton("📤 Экспорт в .rpy", self)
         btn_run = QPushButton("▶️ Запустить в Ren'Py", self)
 
         btn_new.clicked.connect(self._on_new_project)
         btn_open.clicked.connect(self._on_open_project)
         btn_save.clicked.connect(self._on_save_project)
         btn_generate.clicked.connect(self._on_generate_code)
+        btn_export.clicked.connect(self._on_export_rpy)
         btn_run.clicked.connect(self._on_run_project)
 
-        for w in (btn_new, btn_open, btn_save, btn_generate, btn_run):
+        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_run):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
@@ -254,6 +256,47 @@ class MainWindow(QMainWindow):
             return
 
         self.preview_panel.set_code(code)
+    
+    def _on_export_rpy(self) -> None:
+        """Экспортировать сгенерированный код в .rpy файл"""
+        if not self._controller.project:
+            QMessageBox.warning(
+                self,
+                "Нет проекта",
+                "Сначала создай или открой проект.",
+            )
+            return
+        
+        # Предлагаем сохранить в папку проекта по умолчанию
+        default_name = f"{self._controller.get_project_name()}_script.rpy"
+        default_path = None
+        if self._controller.project_path:
+            default_path = self._controller.project_path / default_name
+        
+        # Диалог выбора файла
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Экспорт в .rpy файл",
+            str(default_path) if default_path else default_name,
+            "Ren'Py Script Files (*.rpy);;All Files (*.*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            self._controller.export_to_rpy(Path(file_path))
+            QMessageBox.information(
+                self,
+                "Экспорт завершен",
+                f"Код успешно экспортирован в:\n{file_path}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Ошибка экспорта",
+                f"Не удалось экспортировать файл:\n{str(e)}",
+            )
 
     def _on_run_project(self) -> None:
         if not self._controller.project or not self._controller.project_path:
