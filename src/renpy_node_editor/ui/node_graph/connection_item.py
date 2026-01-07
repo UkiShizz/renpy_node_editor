@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter
 from PySide6.QtWidgets import QGraphicsPathItem
 
@@ -23,8 +23,8 @@ class ConnectionItem(QGraphicsPathItem):
         
         # Более яркая и толстая линия
         self._pen = QPen(QColor("#A0A0A0"), 3)
-        self._pen.setCapStyle(QPen.RoundCap)
-        self._pen.setJoinStyle(QPen.RoundJoin)
+        self._pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        self._pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         self.setPen(self._pen)
 
         self._tmp_end = None
@@ -78,7 +78,7 @@ class ConnectionItem(QGraphicsPathItem):
         
         # Рисуем тень
         shadow_pen = QPen(QColor(0, 0, 0, 40), 5)
-        shadow_pen.setCapStyle(QPen.RoundCap)
+        shadow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(shadow_pen)
         painter.drawPath(self.path())
         
