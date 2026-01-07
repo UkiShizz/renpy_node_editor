@@ -401,37 +401,20 @@ class MainWindow(QMainWindow):
         """Загрузить сохраненные пропорции панелей"""
         # Загружаем пропорции главного splitter (лево-право)
         saved_sizes = get_splitter_sizes("main")
-        if saved_sizes and len(saved_sizes) == 2:
-            # Устанавливаем размеры только если они валидны
-            if all(s > 0 for s in saved_sizes):
-                self.main_splitter.setSizes(saved_sizes)
-            else:
-                # Значения по умолчанию
-                self.main_splitter.setStretchFactor(0, 3)
-                self.main_splitter.setStretchFactor(1, 2)
+        if saved_sizes and len(saved_sizes) == 2 and all(s > 0 for s in saved_sizes):
+            self.main_splitter.setSizes(saved_sizes)
         else:
-            # Значения по умолчанию
             self.main_splitter.setStretchFactor(0, 3)
             self.main_splitter.setStretchFactor(1, 2)
         
         # Загружаем пропорции правого splitter (сцены-палитра-превью-свойства)
         saved_right_sizes = get_splitter_sizes("right")
-        if saved_right_sizes and len(saved_right_sizes) == 4:
-            # Устанавливаем размеры только если они валидны
-            if all(s > 0 for s in saved_right_sizes):
-                self.right_splitter.setSizes(saved_right_sizes)
-            else:
-                # Значения по умолчанию (сцены меньше, остальные равномерно)
-                self.right_splitter.setStretchFactor(0, 1)
-                self.right_splitter.setStretchFactor(1, 2)
-                self.right_splitter.setStretchFactor(2, 2)
-                self.right_splitter.setStretchFactor(3, 2)
+        if saved_right_sizes and len(saved_right_sizes) == 4 and all(s > 0 for s in saved_right_sizes):
+            self.right_splitter.setSizes(saved_right_sizes)
         else:
             # Значения по умолчанию (сцены меньше, остальные равномерно)
-            self.right_splitter.setStretchFactor(0, 1)
-            self.right_splitter.setStretchFactor(1, 2)
-            self.right_splitter.setStretchFactor(2, 2)
-            self.right_splitter.setStretchFactor(3, 2)
+            for i, factor in enumerate((1, 2, 2, 2)):
+                self.right_splitter.setStretchFactor(i, factor)
     
     def _on_splitter_moved(self, splitter_name: str, pos: int, index: int) -> None:
         """Обработчик изменения пропорций панелей"""

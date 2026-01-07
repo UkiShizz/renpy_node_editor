@@ -1,6 +1,7 @@
 """Block code generators"""
 from __future__ import annotations
 
+import json
 from typing import Optional, Any
 from renpy_node_editor.core.model import Block, BlockType, Scene
 from renpy_node_editor.core.generator.utils import INDENT, escape_text, format_value
@@ -80,9 +81,8 @@ def generate_menu(block: Block, indent: str) -> str:
     choices = block.params.get("choices", [])
     if isinstance(choices, str):
         try:
-            import json
             choices = json.loads(choices)
-        except:
+        except (json.JSONDecodeError, ValueError):
             choices = [{"text": c.strip(), "jump": ""} for c in choices.split(",") if c.strip()]
     elif not isinstance(choices, list):
         choices = []

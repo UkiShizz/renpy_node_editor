@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Set, Tuple
 from collections import defaultdict
-import math
 
-from renpy_node_editor.core.model import Scene, Block, Connection, Port
+from renpy_node_editor.core.model import Scene, Block
 
 INDENT = "    "
 
@@ -14,7 +13,7 @@ def calculate_distance(block1: Block, block2: Block) -> float:
     """Calculate Euclidean distance between two blocks"""
     dx = block2.x - block1.x
     dy = block2.y - block1.y
-    return math.sqrt(dx * dx + dy * dy)
+    return (dx * dx + dy * dy) ** 0.5  # Faster than math.sqrt
 
 
 def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:

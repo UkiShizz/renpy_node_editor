@@ -252,7 +252,6 @@ def generate_renpy_script(project: Project) -> str:
                 lines.append(f"define {char_name} = Character('{char}')\n")
         lines.append("\n")
     elif not project.characters:
-        # Default narrator
         lines.append("define narrator = Character('Narrator')\n\n")
     
     # Generate scenes

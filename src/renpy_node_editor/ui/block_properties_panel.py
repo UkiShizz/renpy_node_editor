@@ -409,7 +409,7 @@ class BlockPropertiesPanel(QWidget):
         if isinstance(choices, str):
             try:
                 choices = json.loads(choices)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 choices = []
         elif not isinstance(choices, list):
             choices = []

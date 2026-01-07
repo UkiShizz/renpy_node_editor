@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from typing import Optional
+import uuid
 
 from PySide6.QtCore import QRectF, Qt, QPointF, Signal
-from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QKeyEvent
+from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent,
     QGraphicsSceneContextMenuEvent, QMenu, QMessageBox
@@ -206,7 +207,7 @@ class NodeScene(QGraphicsScene):
         pos: QPointF = event.scenePos()
 
         block = Block(
-            id=str(id(object())),
+            id=str(uuid.uuid4()),
             type=block_type,
             params={},
             x=pos.x(),
