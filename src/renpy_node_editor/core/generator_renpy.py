@@ -29,15 +29,12 @@ def _get_block_connections(scene: Scene) -> Dict[str, List[str]]:
 
 def _find_start_blocks(scene: Scene, connections_map: Dict[str, List[str]]) -> List[Block]:
     """Найти начальные блоки (те, на которые ничего не указывает)"""
-    # Находим все блоки, на которые что-то указывает
     has_input: Set[str] = set()
     for targets in connections_map.values():
         has_input.update(targets)
     
-    # Начальные блоки - те, на которые ничего не указывает
     start_blocks = [b for b in scene.blocks if b.id not in has_input]
     
-    # Если нет связей, возвращаем все блоки в порядке их позиции
     if not connections_map:
         return sorted(scene.blocks, key=lambda b: (b.y, b.x))
     
@@ -49,26 +46,55 @@ def _gen_label(scene: Scene) -> str:
 
 
 def _gen_say(block: Block, indent: str) -> str:
+    """Генерация диалога персонажа"""
     who = block.params.get("who", "").strip()
     text = block.params.get("text", "").strip()
     
     if not text:
         return ""
     
-    # Экранируем кавычки в тексте
     text = text.replace('"', '\\"')
     
+    # Поддержка дополнительных параметров
+    attrs = []
+    
     if who:
-        return f"{indent}{who} \"{text}\"\n"
+        # Поддержка выражений и атрибутов
+        expression = block.params.get("expression", "").strip()
+        if expression:
+            who = f"{who} {expression}"
+        
+        # Поддержка at (позиция)
+        at_pos = block.params.get("at", "").strip()
+        if at_pos:
+            attrs.append(f"at {at_pos}")
+        
+        # Поддержка with (переход)
+        with_trans = block.params.get("with_transition", "").strip()
+        if with_trans:
+            attrs.append(f"with {with_trans}")
+        
+        result = f"{indent}{who} \"{text}\""
+        if attrs:
+            result += " " + " ".join(attrs)
+        return result + "\n"
+    
     return f"{indent}\"{text}\"\n"
 
 
 def _gen_narration(block: Block, indent: str) -> str:
+    """Генерация повествования"""
     text = block.params.get("text", "").strip()
     if not text:
         return ""
     
     text = text.replace('"', '\\"')
+    
+    # Поддержка переходов
+    with_trans = block.params.get("with_transition", "").strip()
+    if with_trans:
+        return f"{indent}\"{text}\" with {with_trans}\n"
+    
     return f"{indent}\"{text}\"\n"
 
 
@@ -83,15 +109,12 @@ def _gen_menu(block: Block, indent: str) -> str:
     
     lines.append(f"{indent}menu:\n")
     
-    # Получаем варианты из params
     choices = block.params.get("choices", [])
     if isinstance(choices, str):
-        # Если choices - строка, пытаемся распарсить
         try:
             import json
             choices = json.loads(choices)
         except:
-            # Если не JSON, разбиваем по запятым
             choices = [{"text": c.strip(), "jump": ""} for c in choices.split(",") if c.strip()]
     elif not isinstance(choices, list):
         choices = []
@@ -100,19 +123,27 @@ def _gen_menu(block: Block, indent: str) -> str:
         if isinstance(choice, dict):
             text = choice.get("text", "").strip()
             jump = choice.get("jump", "").strip()
+            condition = choice.get("condition", "").strip()
         else:
             text = str(choice).strip()
             jump = ""
+            condition = ""
         
         if not text:
             continue
         
         text = text.replace('"', '\\"')
-        lines.append(f"{indent}{INDENT}\"{text}\":\n")
+        
+        # Поддержка условий для вариантов
+        if condition:
+            lines.append(f"{indent}{INDENT}if {condition}:\n")
+            lines.append(f"{indent}{INDENT*2}\"{text}\":\n")
+        else:
+            lines.append(f"{indent}{INDENT}\"{text}\":\n")
+        
         if jump:
             lines.append(f"{indent}{INDENT*2}jump {jump}\n")
         else:
-            # Если нет jump, просто продолжаем выполнение
             lines.append(f"{indent}{INDENT*2}pass\n")
     
     return "".join(lines)
@@ -128,7 +159,6 @@ def _gen_if(block: Block, indent: str, true_branch: Optional[str] = None, false_
     lines.append(f"{indent}if {condition}:\n")
     
     if true_branch:
-        # Добавляем содержимое ветки True с дополнительным отступом
         for line in true_branch.split('\n'):
             if line.strip():
                 lines.append(f"{indent}{INDENT}{line}\n")
@@ -144,6 +174,50 @@ def _gen_if(block: Block, indent: str, true_branch: Optional[str] = None, false_
                 lines.append(f"{indent}{INDENT}{line}\n")
             else:
                 lines.append("\n")
+    
+    return "".join(lines)
+
+
+def _gen_while(block: Block, indent: str, loop_body: Optional[str] = None) -> str:
+    """Генерация цикла while"""
+    condition = block.params.get("condition", "").strip()
+    if not condition:
+        return ""
+    
+    lines: List[str] = []
+    lines.append(f"{indent}while {condition}:\n")
+    
+    if loop_body:
+        for line in loop_body.split('\n'):
+            if line.strip():
+                lines.append(f"{indent}{INDENT}{line}\n")
+            else:
+                lines.append("\n")
+    else:
+        lines.append(f"{indent}{INDENT}pass\n")
+    
+    return "".join(lines)
+
+
+def _gen_for(block: Block, indent: str, loop_body: Optional[str] = None) -> str:
+    """Генерация цикла for"""
+    var = block.params.get("variable", "").strip()
+    iterable = block.params.get("iterable", "").strip()
+    
+    if not var or not iterable:
+        return ""
+    
+    lines: List[str] = []
+    lines.append(f"{indent}for {var} in {iterable}:\n")
+    
+    if loop_body:
+        for line in loop_body.split('\n'):
+            if line.strip():
+                lines.append(f"{indent}{INDENT}{line}\n")
+            else:
+                lines.append("\n")
+    else:
+        lines.append(f"{indent}{INDENT}pass\n")
     
     return "".join(lines)
 
@@ -167,9 +241,15 @@ def _gen_return(block: Block, indent: str) -> str:
 
 
 def _gen_scene(block: Block, indent: str) -> str:
+    """Генерация scene с поддержкой всех параметров"""
     bg = block.params.get("background", "black").strip()
     if not bg:
         bg = "black"
+    
+    # Поддержка слоев
+    layer = block.params.get("layer", "").strip()
+    if layer:
+        bg = f"{bg} onlayer {layer}"
     
     trans = block.params.get("transition", "").strip()
     line = f"{indent}scene {bg}"
@@ -179,28 +259,67 @@ def _gen_scene(block: Block, indent: str) -> str:
 
 
 def _gen_show(block: Block, indent: str) -> str:
+    """Генерация show с поддержкой всех параметров"""
     char = block.params.get("character", "").strip()
     if not char:
         return ""
     
     expr = block.params.get("expression", "").strip()
     at = block.params.get("at", "").strip()
+    behind = block.params.get("behind", "").strip()
+    zorder = block.params.get("zorder", "").strip()
+    layer = block.params.get("layer", "").strip()
     
     parts = [char]
     if expr:
         parts.append(expr)
     
     line = f"{indent}show {' '.join(parts)}"
+    
     if at:
         line += f" at {at}"
+    if behind:
+        line += f" behind {behind}"
+    if zorder:
+        line += f" zorder {zorder}"
+    if layer:
+        line += f" onlayer {layer}"
+    
+    trans = block.params.get("transition", "").strip()
+    if trans:
+        line += f" with {trans}"
+    
     return line + "\n"
 
 
 def _gen_hide(block: Block, indent: str) -> str:
+    """Генерация hide с поддержкой всех параметров"""
     char = block.params.get("character", "").strip()
     if not char:
         return ""
-    return f"{indent}hide {char}\n"
+    
+    line = f"{indent}hide {char}"
+    
+    layer = block.params.get("layer", "").strip()
+    if layer:
+        line += f" onlayer {layer}"
+    
+    trans = block.params.get("transition", "").strip()
+    if trans:
+        line += f" with {trans}"
+    
+    return line + "\n"
+
+
+def _gen_image(block: Block, indent: str) -> str:
+    """Генерация определения изображения"""
+    name = block.params.get("name", "").strip()
+    path = block.params.get("path", "").strip()
+    
+    if not name or not path:
+        return ""
+    
+    return f"{indent}image {name} = \"{path}\"\n"
 
 
 def _gen_pause(block: Block, indent: str) -> str:
@@ -219,24 +338,111 @@ def _gen_transition(block: Block, indent: str) -> str:
     return f"{indent}with {trans}\n"
 
 
+def _gen_with(block: Block, indent: str) -> str:
+    """Генерация with statement"""
+    trans = block.params.get("transition", "dissolve").strip()
+    if not trans:
+        trans = "dissolve"
+    return f"{indent}with {trans}\n"
+
+
 def _gen_sound(block: Block, indent: str) -> str:
+    """Генерация play sound с поддержкой всех параметров"""
     sound_file = block.params.get("sound_file", "").strip()
     if not sound_file:
         return ""
-    return f"{indent}play sound \"{sound_file}\"\n"
+    
+    line = f"{indent}play sound \"{sound_file}\""
+    
+    fadein = block.params.get("fadein", "").strip()
+    fadeout = block.params.get("fadeout", "").strip()
+    loop = block.params.get("loop", "").strip().lower()
+    
+    if fadein:
+        line += f" fadein {fadein}"
+    if fadeout:
+        line += f" fadeout {fadeout}"
+    if loop in ("true", "1", "yes"):
+        line += " loop"
+    
+    return line + "\n"
 
 
 def _gen_music(block: Block, indent: str) -> str:
+    """Генерация play music с поддержкой всех параметров"""
     music_file = block.params.get("music_file", "").strip()
     if not music_file:
         return ""
     
+    line = f"{indent}play music \"{music_file}\""
+    
+    fadein = block.params.get("fadein", "").strip()
+    fadeout = block.params.get("fadeout", "").strip()
     loop = block.params.get("loop", "True").strip().lower()
-    loop_str = "loop" if loop in ("true", "1", "yes") else "noloop"
-    return f"{indent}play music \"{music_file}\" {loop_str}\n"
+    
+    if fadein:
+        line += f" fadein {fadein}"
+    if fadeout:
+        line += f" fadeout {fadeout}"
+    if loop in ("true", "1", "yes"):
+        line += " loop"
+    else:
+        line += " noloop"
+    
+    return line + "\n"
+
+
+def _gen_stop_music(block: Block, indent: str) -> str:
+    """Остановка музыки"""
+    fadeout = block.params.get("fadeout", "").strip()
+    if fadeout:
+        return f"{indent}stop music fadeout {fadeout}\n"
+    return f"{indent}stop music\n"
+
+
+def _gen_stop_sound(block: Block, indent: str) -> str:
+    """Остановка звука"""
+    fadeout = block.params.get("fadeout", "").strip()
+    if fadeout:
+        return f"{indent}stop sound fadeout {fadeout}\n"
+    return f"{indent}stop sound\n"
+
+
+def _gen_queue_music(block: Block, indent: str) -> str:
+    """Очередь музыки"""
+    music_file = block.params.get("music_file", "").strip()
+    if not music_file:
+        return ""
+    
+    fadein = block.params.get("fadein", "").strip()
+    loop = block.params.get("loop", "").strip().lower()
+    
+    line = f"{indent}queue music \"{music_file}\""
+    if fadein:
+        line += f" fadein {fadein}"
+    if loop in ("true", "1", "yes"):
+        line += " loop"
+    
+    return line + "\n"
+
+
+def _gen_queue_sound(block: Block, indent: str) -> str:
+    """Очередь звука"""
+    sound_file = block.params.get("sound_file", "").strip()
+    if not sound_file:
+        return ""
+    
+    fadein = block.params.get("fadein", "").strip()
+    
+    line = f"{indent}queue sound \"{sound_file}\""
+    if fadein:
+        line += f" fadein {fadein}"
+    
+    return line + "\n"
 
 
 def _gen_set_var(block: Block, indent: str) -> str:
+    """Генерация установки переменной"""
     var = block.params.get("variable", "").strip()
     value = block.params.get("value", "").strip()
     
@@ -245,15 +451,129 @@ def _gen_set_var(block: Block, indent: str) -> str:
     
     # Пытаемся определить тип значения
     try:
-        # Пробуем как число
         float(value)
         return f"{indent}$ {var} = {value}\n"
     except ValueError:
-        # Если не число, то строка
         if value.startswith('"') and value.endswith('"'):
+            return f"{indent}$ {var} = {value}\n"
+        elif value.startswith('[') or value.startswith('{'):
+            # Список или словарь
             return f"{indent}$ {var} = {value}\n"
         else:
             return f"{indent}$ {var} = \"{value}\"\n"
+
+
+def _gen_default(block: Block, indent: str) -> str:
+    """Генерация default statement"""
+    var = block.params.get("variable", "").strip()
+    value = block.params.get("value", "").strip()
+    
+    if not var:
+        return ""
+    
+    try:
+        float(value)
+        return f"{indent}default {var} = {value}\n"
+    except ValueError:
+        if value.startswith('"') and value.endswith('"'):
+            return f"{indent}default {var} = {value}\n"
+        elif value.startswith('[') or value.startswith('{'):
+            return f"{indent}default {var} = {value}\n"
+        else:
+            return f"{indent}default {var} = \"{value}\"\n"
+
+
+def _gen_define(block: Block, indent: str) -> str:
+    """Генерация define statement"""
+    name = block.params.get("name", "").strip()
+    value = block.params.get("value", "").strip()
+    
+    if not name:
+        return ""
+    
+    try:
+        float(value)
+        return f"{indent}define {name} = {value}\n"
+    except ValueError:
+        if value.startswith('"') and value.endswith('"'):
+            return f"{indent}define {name} = {value}\n"
+        elif value.startswith('[') or value.startswith('{'):
+            return f"{indent}define {name} = {value}\n"
+        else:
+            return f"{indent}define {name} = \"{value}\"\n"
+
+
+def _gen_python(block: Block, indent: str) -> str:
+    """Генерация Python кода"""
+    code = block.params.get("code", "").strip()
+    if not code:
+        return ""
+    
+    lines: List[str] = []
+    lines.append(f"{indent}python:\n")
+    
+    # Разбиваем код на строки и добавляем отступ
+    for line in code.split('\n'):
+        if line.strip():
+            lines.append(f"{indent}{INDENT}{line}\n")
+        else:
+            lines.append("\n")
+    
+    return "".join(lines)
+
+
+def _gen_character(block: Block, indent: str) -> str:
+    """Генерация определения персонажа"""
+    name = block.params.get("name", "").strip()
+    display_name = block.params.get("display_name", "").strip()
+    
+    if not name:
+        return ""
+    
+    if display_name:
+        display_name = display_name.replace("'", "\\'")
+        return f"{indent}define {name} = Character('{display_name}')\n"
+    else:
+        return f"{indent}define {name} = Character(None)\n"
+
+
+def _gen_voice(block: Block, indent: str) -> str:
+    """Генерация voice statement"""
+    voice_file = block.params.get("voice_file", "").strip()
+    if not voice_file:
+        return ""
+    
+    return f"{indent}voice \"{voice_file}\"\n"
+
+
+def _gen_center(block: Block, indent: str) -> str:
+    """Генерация center statement"""
+    text = block.params.get("text", "").strip()
+    if not text:
+        return ""
+    
+    text = text.replace('"', '\\"')
+    return f"{indent}centered \"{text}\"\n"
+
+
+def _gen_text(block: Block, indent: str) -> str:
+    """Генерация text statement"""
+    text = block.params.get("text", "").strip()
+    if not text:
+        return ""
+    
+    text = text.replace('"', '\\"')
+    
+    xpos = block.params.get("xpos", "").strip()
+    ypos = block.params.get("ypos", "").strip()
+    
+    line = f"{indent}text \"{text}\""
+    if xpos:
+        line += f" xpos {xpos}"
+    if ypos:
+        line += f" ypos {ypos}"
+    
+    return line + "\n"
 
 
 def _generate_block(block: Block, indent: str) -> str:
@@ -265,7 +585,13 @@ def _generate_block(block: Block, indent: str) -> str:
     elif block.type is BlockType.MENU:
         return _gen_menu(block, indent)
     elif block.type is BlockType.IF:
-        # IF обрабатывается отдельно в _generate_scene
+        # IF обрабатывается отдельно
+        return ""
+    elif block.type is BlockType.WHILE:
+        # WHILE обрабатывается отдельно
+        return ""
+    elif block.type is BlockType.FOR:
+        # FOR обрабатывается отдельно
         return ""
     elif block.type is BlockType.JUMP:
         return _gen_jump(block, indent)
@@ -279,16 +605,42 @@ def _generate_block(block: Block, indent: str) -> str:
         return _gen_show(block, indent)
     elif block.type is BlockType.HIDE:
         return _gen_hide(block, indent)
+    elif block.type is BlockType.IMAGE:
+        return _gen_image(block, indent)
     elif block.type is BlockType.PAUSE:
         return _gen_pause(block, indent)
     elif block.type is BlockType.TRANSITION:
         return _gen_transition(block, indent)
+    elif block.type is BlockType.WITH:
+        return _gen_with(block, indent)
     elif block.type is BlockType.SOUND:
         return _gen_sound(block, indent)
     elif block.type is BlockType.MUSIC:
         return _gen_music(block, indent)
+    elif block.type is BlockType.STOP_MUSIC:
+        return _gen_stop_music(block, indent)
+    elif block.type is BlockType.STOP_SOUND:
+        return _gen_stop_sound(block, indent)
+    elif block.type is BlockType.QUEUE_MUSIC:
+        return _gen_queue_music(block, indent)
+    elif block.type is BlockType.QUEUE_SOUND:
+        return _gen_queue_sound(block, indent)
     elif block.type is BlockType.SET_VAR:
         return _gen_set_var(block, indent)
+    elif block.type is BlockType.DEFAULT:
+        return _gen_default(block, indent)
+    elif block.type is BlockType.DEFINE:
+        return _gen_define(block, indent)
+    elif block.type is BlockType.PYTHON:
+        return _gen_python(block, indent)
+    elif block.type is BlockType.CHARACTER:
+        return _gen_character(block, indent)
+    elif block.type is BlockType.VOICE:
+        return _gen_voice(block, indent)
+    elif block.type is BlockType.CENTER:
+        return _gen_center(block, indent)
+    elif block.type is BlockType.TEXT:
+        return _gen_text(block, indent)
     elif block.type is BlockType.LABEL:
         label = block.params.get("label", "").strip()
         if label:
@@ -316,30 +668,50 @@ def _generate_block_chain(
     
     # Генерируем код для текущего блока
     if block.type is BlockType.IF:
-        # Специальная обработка IF блока
         condition = block.params.get("condition", "").strip()
         if condition:
-            # Находим следующие блоки
             next_blocks = connections_map.get(block.id, [])
             
             true_branch = ""
             false_branch = ""
             
             if len(next_blocks) >= 1:
-                # Первый выход - ветка True
                 true_branch = _generate_block_chain(
                     scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT
                 )
             
             if len(next_blocks) >= 2:
-                # Второй выход - ветка False
                 false_branch = _generate_block_chain(
                     scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT
                 )
             
             lines.append(_gen_if(block, indent, true_branch, false_branch))
+    elif block.type is BlockType.WHILE:
+        condition = block.params.get("condition", "").strip()
+        if condition:
+            next_blocks = connections_map.get(block.id, [])
+            loop_body = ""
+            
+            if next_blocks:
+                loop_body = _generate_block_chain(
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT
+                )
+            
+            lines.append(_gen_while(block, indent, loop_body))
+    elif block.type is BlockType.FOR:
+        var = block.params.get("variable", "").strip()
+        iterable = block.params.get("iterable", "").strip()
+        if var and iterable:
+            next_blocks = connections_map.get(block.id, [])
+            loop_body = ""
+            
+            if next_blocks:
+                loop_body = _generate_block_chain(
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT
+                )
+            
+            lines.append(_gen_for(block, indent, loop_body))
     else:
-        # Обычный блок
         code = _generate_block(block, indent)
         if code:
             lines.append(code)
@@ -361,28 +733,22 @@ def _generate_scene(scene: Scene) -> str:
     """Генерация кода для сцены с учетом связей между блоками"""
     lines: List[str] = []
     
-    # Заголовок сцены
     lines.append(_gen_label(scene))
     
     if not scene.blocks:
         lines.append(f"{INDENT}pass\n\n")
         return "".join(lines)
     
-    # Создаем карту связей
     connections_map = _get_block_connections(scene)
-    
-    # Находим начальные блоки
     start_blocks = _find_start_blocks(scene, connections_map)
     
     if not start_blocks:
-        # Если нет начальных блоков, генерируем все блоки по порядку
         indent = INDENT
         for block in sorted(scene.blocks, key=lambda b: (b.y, b.x)):
             code = _generate_block(block, indent)
             if code:
                 lines.append(code)
     else:
-        # Генерируем от начальных блоков
         visited: Set[str] = set()
         for start_block in start_blocks:
             code = _generate_block_chain(
@@ -391,11 +757,10 @@ def _generate_scene(scene: Scene) -> str:
             if code:
                 lines.append(code)
         
-        # Добавляем блоки, которые не были обработаны (без связей)
+        # Добавляем блоки, которые не были обработаны
         processed = set()
         for start_block in start_blocks:
             processed.add(start_block.id)
-            # Добавляем все связанные блоки
             stack = [start_block.id]
             while stack:
                 current_id = stack.pop()
@@ -404,7 +769,6 @@ def _generate_scene(scene: Scene) -> str:
                         processed.add(next_id)
                         stack.append(next_id)
         
-        # Добавляем непрошедшие блоки
         for block in scene.blocks:
             if block.id not in processed:
                 code = _generate_block(block, INDENT)
@@ -419,6 +783,11 @@ def _extract_characters(project: Project) -> Set[str]:
     """Извлечь всех персонажей из проекта"""
     characters: Set[str] = set()
     
+    # Добавляем персонажей из глобальных определений
+    for char_name in project.characters.keys():
+        characters.add(char_name)
+    
+    # Извлекаем из блоков
     for scene in project.scenes:
         for block in scene.blocks:
             if block.type is BlockType.SAY:
@@ -429,8 +798,38 @@ def _extract_characters(project: Project) -> Set[str]:
                 char = block.params.get("character", "").strip()
                 if char:
                     characters.add(char)
+            elif block.type is BlockType.CHARACTER:
+                name = block.params.get("name", "").strip()
+                if name:
+                    characters.add(name)
     
     return characters
+
+
+def _generate_definitions(project: Project) -> str:
+    """Генерация глобальных определений (define, default, image)"""
+    lines: List[str] = []
+    
+    # Определения изображений
+    if project.images:
+        lines.append("# Image Definitions\n")
+        for name, path in sorted(project.images.items()):
+            lines.append(f"image {name} = \"{path}\"\n")
+        lines.append("\n")
+    
+    # Определения персонажей
+    if project.characters:
+        lines.append("# Character Definitions\n")
+        for name, char_data in sorted(project.characters.items()):
+            display_name = char_data.get("display_name", "")
+            if display_name:
+                display_name = display_name.replace("'", "\\'")
+                lines.append(f"define {name} = Character('{display_name}')\n")
+            else:
+                lines.append(f"define {name} = Character(None)\n")
+        lines.append("\n")
+    
+    return "".join(lines)
 
 
 def generate_renpy_script(project: Project) -> str:
@@ -443,16 +842,22 @@ def generate_renpy_script(project: Project) -> str:
     lines.append("# Generated by RenPy Node Editor\n")
     lines.append("# This file is auto-generated. Do not edit manually.\n\n")
     
-    # Извлекаем персонажей и создаем define
+    # Глобальные определения
+    def_lines = _generate_definitions(project)
+    if def_lines:
+        lines.append(def_lines)
+    
+    # Извлекаем персонажей из блоков и создаем define
     characters = _extract_characters(project)
     if characters:
-        lines.append("# Characters\n")
+        lines.append("# Characters (auto-detected)\n")
         for char in sorted(characters):
-            # Простое имя персонажа
-            char_name = char.replace(" ", "_").replace("-", "_")
-            lines.append(f"define {char_name} = Character('{char}')\n")
+            # Проверяем, не определен ли уже в project.characters
+            if char not in project.characters:
+                char_name = char.replace(" ", "_").replace("-", "_")
+                lines.append(f"define {char_name} = Character('{char}')\n")
         lines.append("\n")
-    else:
+    elif not project.characters:
         # Дефолтный narrator
         lines.append("define narrator = Character('Narrator')\n\n")
     

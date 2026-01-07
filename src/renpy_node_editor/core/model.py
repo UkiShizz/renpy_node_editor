@@ -17,24 +17,50 @@ class BlockType(Enum):
     
     # Визуальные элементы
     SCENE = auto()          # Смена фона
-    SHOW = auto()           # Показать персонажа
-    HIDE = auto()           # Скрыть персонажа
+    SHOW = auto()           # Показать персонажа/изображение
+    HIDE = auto()           # Скрыть персонажа/изображение
+    IMAGE = auto()          # Определение изображения
     
     # Логика игры
     MENU = auto()           # Меню выбора для игрока
     IF = auto()             # Условное ветвление
+    ELIF = auto()           # Дополнительное условие
+    ELSE = auto()           # Альтернативная ветка
+    WHILE = auto()          # Цикл while
+    FOR = auto()            # Цикл for
     JUMP = auto()           # Переход на другую метку
     CALL = auto()           # Вызов другой сцены
     
     # Эффекты и паузы
     PAUSE = auto()          # Пауза
     TRANSITION = auto()     # Переход между сценами
+    WITH = auto()           # Применить переход
+    
+    # Аудио
     SOUND = auto()          # Звуковые эффекты
     MUSIC = auto()          # Фоновая музыка
+    STOP_MUSIC = auto()     # Остановить музыку
+    STOP_SOUND = auto()     # Остановить звук
+    QUEUE_MUSIC = auto()    # Очередь музыки
+    QUEUE_SOUND = auto()    # Очередь звука
     
-    # Переменные
+    # Переменные и данные
     SET_VAR = auto()        # Установить переменную
+    DEFAULT = auto()        # Значение по умолчанию
+    DEFINE = auto()         # Определение константы
+    PYTHON = auto()         # Выполнить Python код
     
+    # Персонажи и определения
+    CHARACTER = auto()      # Определение персонажа
+    STYLE = auto()          # Определение стиля
+    
+    # Дополнительные функции
+    VOICE = auto()          # Голосовая реплика
+    EXTEND = auto()         # Продолжение диалога
+    INTERJECT = auto()      # Вставка в диалог
+    CENTER = auto()         # Центрированный текст
+    TEXT = auto()           # Текст на экране
+
 
 class PortDirection(Enum):
     INPUT = auto()
@@ -129,6 +155,10 @@ class Project:
     name: str
     scenes: List[Scene] = field(default_factory=list)
     variables: Dict[str, Any] = field(default_factory=dict)
+    # Глобальные определения (персонажи, изображения, стили)
+    characters: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    images: Dict[str, str] = field(default_factory=dict)
+    styles: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     
     def find_scene(self, scene_id: str) -> Optional[Scene]:
         for s in self.scenes:

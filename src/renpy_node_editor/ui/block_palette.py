@@ -66,13 +66,32 @@ class BlockPalette(QListWidget):
 
     def _populate_items(self) -> None:
         """Заполнить палитру типами блоков с группировкой"""
-        # Группируем блоки по категориям
+        # Группируем блоки по категориям согласно документации Ren'Py
         categories = {
-            "Диалоги": [BlockType.SAY, BlockType.NARRATION],
-            "Визуальные": [BlockType.SCENE, BlockType.SHOW, BlockType.HIDE],
-            "Логика": [BlockType.IF, BlockType.MENU, BlockType.JUMP, BlockType.CALL, BlockType.LABEL],
-            "Эффекты": [BlockType.PAUSE, BlockType.TRANSITION, BlockType.SOUND, BlockType.MUSIC],
-            "Данные": [BlockType.SET_VAR, BlockType.RETURN],
+            "📝 Диалоги и текст": [
+                BlockType.SAY, BlockType.NARRATION, BlockType.VOICE, 
+                BlockType.CENTER, BlockType.TEXT
+            ],
+            "🖼️ Визуальные элементы": [
+                BlockType.SCENE, BlockType.SHOW, BlockType.HIDE, BlockType.IMAGE
+            ],
+            "🔀 Логика и управление": [
+                BlockType.IF, BlockType.WHILE, BlockType.FOR, BlockType.MENU, 
+                BlockType.JUMP, BlockType.CALL, BlockType.LABEL, BlockType.RETURN
+            ],
+            "🎬 Эффекты и переходы": [
+                BlockType.PAUSE, BlockType.TRANSITION, BlockType.WITH
+            ],
+            "🔊 Аудио": [
+                BlockType.SOUND, BlockType.MUSIC, BlockType.STOP_SOUND, 
+                BlockType.STOP_MUSIC, BlockType.QUEUE_SOUND, BlockType.QUEUE_MUSIC
+            ],
+            "💾 Переменные и данные": [
+                BlockType.SET_VAR, BlockType.DEFAULT, BlockType.DEFINE, BlockType.PYTHON
+            ],
+            "👤 Определения": [
+                BlockType.CHARACTER, BlockType.STYLE
+            ],
         }
         
         for category, block_types in categories.items():

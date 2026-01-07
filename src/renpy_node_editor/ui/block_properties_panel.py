@@ -5,7 +5,7 @@ import json
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton,
-    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox
+    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QTextEdit
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -44,6 +44,19 @@ class BlockPropertiesPanel(QWidget):
                 font-size: 10px;
             }
             QLineEdit:focus {
+                border-color: #4A90E2;
+                background-color: #2F2F2F;
+            }
+            QTextEdit {
+                background-color: #2A2A2A;
+                border: 2px solid #3A3A3A;
+                border-radius: 4px;
+                padding: 6px;
+                color: #E0E0E0;
+                font-size: 10px;
+                font-family: 'Consolas', monospace;
+            }
+            QTextEdit:focus {
                 border-color: #4A90E2;
                 background-color: #2F2F2F;
             }
@@ -133,45 +146,102 @@ class BlockPropertiesPanel(QWidget):
         if not self.current_block:
             return
         
-        if self.current_block.type == BlockType.SAY:
+        block_type = self.current_block.type
+        
+        if block_type == BlockType.SAY:
             self._add_text_field("who", "Персонаж:", "")
             self._add_text_field("text", "Текст:", "")
-        elif self.current_block.type == BlockType.NARRATION:
-            self._add_text_field("text", "Текст:", "")
-        elif self.current_block.type == BlockType.MENU:
-            self._add_text_field("question", "Вопрос:", "")
-            self._add_menu_choices()
-        elif self.current_block.type == BlockType.IF:
-            self._add_text_field("condition", "Условие:", "variable == True")
-        elif self.current_block.type == BlockType.JUMP:
-            self._add_text_field("target", "Переход на метку:", "")
-        elif self.current_block.type == BlockType.CALL:
-            self._add_text_field("label", "Вызов метки:", "")
-        elif self.current_block.type == BlockType.PAUSE:
-            self._add_text_field("duration", "Длительность (сек):", "1.0")
-        elif self.current_block.type == BlockType.TRANSITION:
-            self._add_text_field("transition", "Название перехода:", "fade")
-            self._add_text_field("duration", "Длительность:", "1.0")
-        elif self.current_block.type == BlockType.SOUND:
-            self._add_text_field("sound_file", "Файл звука:", "")
-        elif self.current_block.type == BlockType.MUSIC:
-            self._add_text_field("music_file", "Файл музыки:", "")
-            self._add_checkbox("loop", "Зациклить", True)
-        elif self.current_block.type == BlockType.SET_VAR:
-            self._add_text_field("variable", "Имя переменной:", "")
-            self._add_text_field("value", "Значение:", "")
-        elif self.current_block.type == BlockType.LABEL:
-            self._add_text_field("label", "Имя метки:", "")
-        elif self.current_block.type == BlockType.SCENE:
-            self._add_text_field("background", "Фон:", "black")
-            self._add_text_field("transition", "Переход (опционально):", "")
-        elif self.current_block.type == BlockType.SHOW:
-            self._add_text_field("character", "Персонаж:", "")
             self._add_text_field("expression", "Выражение (опционально):", "")
             self._add_text_field("at", "Позиция (опционально):", "")
-        elif self.current_block.type == BlockType.HIDE:
+            self._add_text_field("with_transition", "Переход (опционально):", "")
+        elif block_type == BlockType.NARRATION:
+            self._add_text_field("text", "Текст:", "")
+            self._add_text_field("with_transition", "Переход (опционально):", "")
+        elif block_type == BlockType.MENU:
+            self._add_text_field("question", "Вопрос:", "")
+            self._add_menu_choices()
+        elif block_type == BlockType.IF:
+            self._add_text_field("condition", "Условие:", "variable == True")
+        elif block_type == BlockType.WHILE:
+            self._add_text_field("condition", "Условие:", "True")
+        elif block_type == BlockType.FOR:
+            self._add_text_field("variable", "Переменная:", "i")
+            self._add_text_field("iterable", "Итерируемый объект:", "[1, 2, 3]")
+        elif block_type == BlockType.JUMP:
+            self._add_text_field("target", "Переход на метку:", "")
+        elif block_type == BlockType.CALL:
+            self._add_text_field("label", "Вызов метки:", "")
+        elif block_type == BlockType.PAUSE:
+            self._add_text_field("duration", "Длительность (сек):", "1.0")
+        elif block_type == BlockType.TRANSITION:
+            self._add_text_field("transition", "Название перехода:", "dissolve")
+        elif block_type == BlockType.WITH:
+            self._add_text_field("transition", "Название перехода:", "dissolve")
+        elif block_type == BlockType.SOUND:
+            self._add_text_field("sound_file", "Файл звука:", "")
+            self._add_text_field("fadein", "Fade in (сек, опционально):", "")
+            self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
+            self._add_checkbox("loop", "Зациклить", False)
+        elif block_type == BlockType.MUSIC:
+            self._add_text_field("music_file", "Файл музыки:", "")
+            self._add_text_field("fadein", "Fade in (сек, опционально):", "")
+            self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
+            self._add_checkbox("loop", "Зациклить", True)
+        elif block_type == BlockType.STOP_MUSIC:
+            self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
+        elif block_type == BlockType.STOP_SOUND:
+            self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
+        elif block_type == BlockType.QUEUE_MUSIC:
+            self._add_text_field("music_file", "Файл музыки:", "")
+            self._add_text_field("fadein", "Fade in (сек, опционально):", "")
+            self._add_checkbox("loop", "Зациклить", False)
+        elif block_type == BlockType.QUEUE_SOUND:
+            self._add_text_field("sound_file", "Файл звука:", "")
+            self._add_text_field("fadein", "Fade in (сек, опционально):", "")
+        elif block_type == BlockType.SET_VAR:
+            self._add_text_field("variable", "Имя переменной:", "")
+            self._add_text_field("value", "Значение:", "")
+        elif block_type == BlockType.DEFAULT:
+            self._add_text_field("variable", "Имя переменной:", "")
+            self._add_text_field("value", "Значение по умолчанию:", "")
+        elif block_type == BlockType.DEFINE:
+            self._add_text_field("name", "Имя константы:", "")
+            self._add_text_field("value", "Значение:", "")
+        elif block_type == BlockType.PYTHON:
+            self._add_code_field("code", "Python код:")
+        elif block_type == BlockType.CHARACTER:
+            self._add_text_field("name", "Имя персонажа:", "")
+            self._add_text_field("display_name", "Отображаемое имя:", "")
+        elif block_type == BlockType.IMAGE:
+            self._add_text_field("name", "Имя изображения:", "")
+            self._add_text_field("path", "Путь к файлу:", "")
+        elif block_type == BlockType.LABEL:
+            self._add_text_field("label", "Имя метки:", "")
+        elif block_type == BlockType.SCENE:
+            self._add_text_field("background", "Фон:", "black")
+            self._add_text_field("layer", "Слой (опционально):", "")
+            self._add_text_field("transition", "Переход (опционально):", "")
+        elif block_type == BlockType.SHOW:
+            self._add_text_field("character", "Персонаж/Изображение:", "")
+            self._add_text_field("expression", "Выражение (опционально):", "")
+            self._add_text_field("at", "Позиция (опционально):", "")
+            self._add_text_field("behind", "Behind (опционально):", "")
+            self._add_text_field("zorder", "Z-order (опционально):", "")
+            self._add_text_field("layer", "Слой (опционально):", "")
+            self._add_text_field("transition", "Переход (опционально):", "")
+        elif block_type == BlockType.HIDE:
             self._add_text_field("character", "Персонаж:", "")
-        elif self.current_block.type == BlockType.RETURN:
+            self._add_text_field("layer", "Слой (опционально):", "")
+            self._add_text_field("transition", "Переход (опционально):", "")
+        elif block_type == BlockType.VOICE:
+            self._add_text_field("voice_file", "Файл голоса:", "")
+        elif block_type == BlockType.CENTER:
+            self._add_text_field("text", "Текст:", "")
+        elif block_type == BlockType.TEXT:
+            self._add_text_field("text", "Текст:", "")
+            self._add_text_field("xpos", "X позиция (опционально):", "")
+            self._add_text_field("ypos", "Y позиция (опционально):", "")
+        elif block_type == BlockType.RETURN:
             # RETURN has no parameters
             pass
 
@@ -185,6 +255,18 @@ class BlockPropertiesPanel(QWidget):
         input_widget.setText(str(value))
         self._param_widgets[key] = input_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, input_widget)
+
+    def _add_code_field(self, key: str, label: str) -> None:
+        """Add a multi-line code input field"""
+        label_widget = QLabel(label, self)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
+        
+        code_widget = QTextEdit(self)
+        code_widget.setMaximumHeight(150)
+        value = self.current_block.params.get(key, "") if self.current_block else ""
+        code_widget.setPlainText(str(value))
+        self._param_widgets[key] = code_widget
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, code_widget)
 
     def _add_checkbox(self, key: str, label: str, default: bool = False) -> None:
         """Add a checkbox for a boolean parameter."""
@@ -201,11 +283,9 @@ class BlockPropertiesPanel(QWidget):
         choices_label = QLabel("Варианты меню:", self)
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, choices_label)
         
-        # List widget для отображения вариантов
         choices_list = QListWidget(self)
         choices_list.setMaximumHeight(150)
         
-        # Загружаем существующие варианты
         choices = self.current_block.params.get("choices", [])
         if isinstance(choices, str):
             try:
@@ -219,7 +299,12 @@ class BlockPropertiesPanel(QWidget):
             if isinstance(choice, dict):
                 text = choice.get("text", "")
                 jump = choice.get("jump", "")
-                item_text = f"{text} → {jump}" if jump else text
+                condition = choice.get("condition", "")
+                item_text = f"{text}"
+                if jump:
+                    item_text += f" → {jump}"
+                if condition:
+                    item_text += f" [if {condition}]"
             else:
                 item_text = str(choice)
             choices_list.addItem(item_text)
@@ -228,7 +313,6 @@ class BlockPropertiesPanel(QWidget):
         self._param_widgets["_choices_data"] = choices
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, choices_list)
         
-        # Кнопки управления
         choices_buttons = QHBoxLayout()
         choices_buttons.setSpacing(4)
         
@@ -290,12 +374,20 @@ class BlockPropertiesPanel(QWidget):
         if not ok2:
             return
         
-        choice = {"text": text, "jump": jump}
+        condition, ok3 = QInputDialog.getText(self, "Вариант меню", "Условие (опционально):")
+        if not ok3:
+            return
+        
+        choice = {"text": text, "jump": jump, "condition": condition}
         choices_data = self._param_widgets.get("_choices_data", [])
         choices_data.append(choice)
         self._param_widgets["_choices_data"] = choices_data
         
-        item_text = f"{text} → {jump}" if jump else text
+        item_text = f"{text}"
+        if jump:
+            item_text += f" → {jump}"
+        if condition:
+            item_text += f" [if {condition}]"
         choices_list.addItem(item_text)
 
     def _edit_menu_choice(self, choices_list: QListWidget) -> None:
@@ -313,9 +405,11 @@ class BlockPropertiesPanel(QWidget):
             if isinstance(choice, dict):
                 text = choice.get("text", "")
                 jump = choice.get("jump", "")
+                condition = choice.get("condition", "")
             else:
                 text = str(choice)
                 jump = ""
+                condition = ""
             
             from PySide6.QtWidgets import QInputDialog
             
@@ -327,10 +421,18 @@ class BlockPropertiesPanel(QWidget):
             if not ok2:
                 return
             
-            choices_data[index] = {"text": new_text, "jump": new_jump}
+            new_condition, ok3 = QInputDialog.getText(self, "Редактировать вариант", "Условие (опционально):", text=condition)
+            if not ok3:
+                return
+            
+            choices_data[index] = {"text": new_text, "jump": new_jump, "condition": new_condition}
             self._param_widgets["_choices_data"] = choices_data
             
-            item_text = f"{new_text} → {new_jump}" if new_jump else new_text
+            item_text = f"{new_text}"
+            if new_jump:
+                item_text += f" → {new_jump}"
+            if new_condition:
+                item_text += f" [if {new_condition}]"
             current_item.setText(item_text)
 
     def _remove_menu_choice(self, choices_list: QListWidget) -> None:
@@ -356,10 +458,12 @@ class BlockPropertiesPanel(QWidget):
         
         for key, widget in self._param_widgets.items():
             if key.startswith("_"):
-                continue  # Пропускаем служебные виджеты
+                continue
             
             if isinstance(widget, QLineEdit):
                 self.current_block.params[key] = widget.text()
+            elif isinstance(widget, QTextEdit):
+                self.current_block.params[key] = widget.toPlainText()
             elif isinstance(widget, QCheckBox):
                 self.current_block.params[key] = widget.isChecked()
         

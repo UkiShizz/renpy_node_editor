@@ -16,14 +16,22 @@ def _get_block_colors(block_type: BlockType) -> tuple[QColor, QColor, QColor]:
         # Диалоги и текст - синий градиент
         BlockType.SAY: (QColor("#4A90E2"), QColor("#6BA3F0"), QColor("#2E5C8A")),
         BlockType.NARRATION: (QColor("#5B9BD5"), QColor("#7DB3E8"), QColor("#3A6B9A")),
+        BlockType.VOICE: (QColor("#5B9BD5"), QColor("#7DB3E8"), QColor("#3A6B9A")),
+        BlockType.CENTER: (QColor("#5B9BD5"), QColor("#7DB3E8"), QColor("#3A6B9A")),
+        BlockType.TEXT: (QColor("#5B9BD5"), QColor("#7DB3E8"), QColor("#3A6B9A")),
         
         # Визуальные элементы - зеленый градиент
         BlockType.SCENE: (QColor("#70AD47"), QColor("#8FC966"), QColor("#4F7A2F")),
         BlockType.SHOW: (QColor("#92D050"), QColor("#A8E066"), QColor("#6B9A38")),
         BlockType.HIDE: (QColor("#A9D18E"), QColor("#C0E8A8"), QColor("#7A9A6A")),
+        BlockType.IMAGE: (QColor("#70AD47"), QColor("#8FC966"), QColor("#4F7A2F")),
         
         # Логика - оранжевый/красный градиент
         BlockType.IF: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
+        BlockType.ELIF: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
+        BlockType.ELSE: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
+        BlockType.WHILE: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
+        BlockType.FOR: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
         BlockType.MENU: (QColor("#FFA07A"), QColor("#FFB896"), QColor("#CC7A5F")),
         BlockType.JUMP: (QColor("#FF8C00"), QColor("#FFA533"), QColor("#CC6F00")),
         BlockType.CALL: (QColor("#FF6347"), QColor("#FF8266"), QColor("#CC4E38")),
@@ -32,11 +40,23 @@ def _get_block_colors(block_type: BlockType) -> tuple[QColor, QColor, QColor]:
         # Эффекты - фиолетовый градиент
         BlockType.PAUSE: (QColor("#9B59B6"), QColor("#B573D1"), QColor("#6B3F7A")),
         BlockType.TRANSITION: (QColor("#8E44AD"), QColor("#A866C7"), QColor("#5E2D73")),
+        BlockType.WITH: (QColor("#8E44AD"), QColor("#A866C7"), QColor("#5E2D73")),
         BlockType.SOUND: (QColor("#7D3C98"), QColor("#9A5CB3"), QColor("#5A2A6B")),
         BlockType.MUSIC: (QColor("#6C3483"), QColor("#8A4FA3"), QColor("#4A2356")),
+        BlockType.STOP_MUSIC: (QColor("#6C3483"), QColor("#8A4FA3"), QColor("#4A2356")),
+        BlockType.STOP_SOUND: (QColor("#7D3C98"), QColor("#9A5CB3"), QColor("#5A2A6B")),
+        BlockType.QUEUE_MUSIC: (QColor("#6C3483"), QColor("#8A4FA3"), QColor("#4A2356")),
+        BlockType.QUEUE_SOUND: (QColor("#7D3C98"), QColor("#9A5CB3"), QColor("#5A2A6B")),
         
         # Переменные - желтый градиент
         BlockType.SET_VAR: (QColor("#F39C12"), QColor("#F5B041"), QColor("#C27D0E")),
+        BlockType.DEFAULT: (QColor("#F39C12"), QColor("#F5B041"), QColor("#C27D0E")),
+        BlockType.DEFINE: (QColor("#F39C12"), QColor("#F5B041"), QColor("#C27D0E")),
+        BlockType.PYTHON: (QColor("#F39C12"), QColor("#F5B041"), QColor("#C27D0E")),
+        
+        # Персонажи и определения - бирюзовый градиент
+        BlockType.CHARACTER: (QColor("#1ABC9C"), QColor("#48C9B0"), QColor("#16A085")),
+        BlockType.STYLE: (QColor("#1ABC9C"), QColor("#48C9B0"), QColor("#16A085")),
         
         # Структура - серый градиент
         BlockType.RETURN: (QColor("#95A5A6"), QColor("#B0C4C5"), QColor("#6B7A7A")),
@@ -161,6 +181,11 @@ class NodeItem(QGraphicsRectItem):
             false_port = PortItem(parent=self, is_output=True, name="False")
             false_port.setPos(self.WIDTH + 6, self.HEIGHT * 2 / 3)
             self.outputs.append(false_port)
+        elif self.block.type == BlockType.WHILE or self.block.type == BlockType.FOR:
+            # Циклы имеют один выход для тела цикла
+            out_port = PortItem(parent=self, is_output=True, name="loop")
+            out_port.setPos(self.WIDTH + 6, self.HEIGHT / 2)
+            self.outputs.append(out_port)
         elif self.block.type == BlockType.MENU:
             # MENU может иметь несколько выходов
             out_port = PortItem(parent=self, is_output=True, name="out")
@@ -230,6 +255,15 @@ class NodeItem(QGraphicsRectItem):
         elif self.block.type == BlockType.NARRATION:
             text = params.get("text", "")
             return text[:35] if text else ""
+        elif self.block.type == BlockType.VOICE:
+            voice = params.get("voice_file", "")
+            return f"voice: {voice}" if voice else ""
+        elif self.block.type == BlockType.CENTER:
+            text = params.get("text", "")
+            return f"centered: {text[:30]}" if text else ""
+        elif self.block.type == BlockType.TEXT:
+            text = params.get("text", "")
+            return f"text: {text[:30]}" if text else ""
         elif self.block.type == BlockType.JUMP:
             target = params.get("target", "")
             return f"→ {target}" if target else ""
@@ -242,6 +276,15 @@ class NodeItem(QGraphicsRectItem):
         elif self.block.type == BlockType.IF:
             condition = params.get("condition", "")
             return condition[:35] if condition else "if ..."
+        elif self.block.type == BlockType.WHILE:
+            condition = params.get("condition", "")
+            return f"while {condition[:30]}" if condition else "while ..."
+        elif self.block.type == BlockType.FOR:
+            var = params.get("variable", "")
+            iterable = params.get("iterable", "")
+            if var and iterable:
+                return f"for {var} in {iterable[:20]}"
+            return f"for {var}..." if var else "for ..."
         elif self.block.type == BlockType.MENU:
             question = params.get("question", "")
             choices = params.get("choices", [])
@@ -258,16 +301,40 @@ class NodeItem(QGraphicsRectItem):
         elif self.block.type == BlockType.HIDE:
             char = params.get("character", "")
             return f"hide {char}" if char else ""
+        elif self.block.type == BlockType.IMAGE:
+            name = params.get("name", "")
+            return f"image {name}" if name else ""
         elif self.block.type == BlockType.SET_VAR:
             var = params.get("variable", "")
             val = params.get("value", "")
             if var and val:
                 return f"{var} = {val}"
             return var if var else ""
+        elif self.block.type == BlockType.DEFAULT:
+            var = params.get("variable", "")
+            val = params.get("value", "")
+            if var and val:
+                return f"default {var} = {val}"
+            return f"default {var}" if var else ""
+        elif self.block.type == BlockType.DEFINE:
+            name = params.get("name", "")
+            val = params.get("value", "")
+            if name and val:
+                return f"define {name} = {val}"
+            return f"define {name}" if name else ""
+        elif self.block.type == BlockType.PYTHON:
+            code = params.get("code", "")
+            return f"python: {code[:30]}..." if code else "python: ..."
+        elif self.block.type == BlockType.CHARACTER:
+            name = params.get("name", "")
+            return f"character {name}" if name else ""
         elif self.block.type == BlockType.PAUSE:
             duration = params.get("duration", "")
             return f"pause {duration}s" if duration else ""
         elif self.block.type == BlockType.TRANSITION:
+            trans = params.get("transition", "")
+            return f"with {trans}" if trans else ""
+        elif self.block.type == BlockType.WITH:
             trans = params.get("transition", "")
             return f"with {trans}" if trans else ""
         elif self.block.type == BlockType.SOUND:
@@ -276,6 +343,20 @@ class NodeItem(QGraphicsRectItem):
         elif self.block.type == BlockType.MUSIC:
             music = params.get("music_file", "")
             return f"music: {music}" if music else ""
+        elif self.block.type == BlockType.STOP_MUSIC:
+            fadeout = params.get("fadeout", "")
+            return f"stop music{f' fadeout {fadeout}' if fadeout else ''}"
+        elif self.block.type == BlockType.STOP_SOUND:
+            fadeout = params.get("fadeout", "")
+            return f"stop sound{f' fadeout {fadeout}' if fadeout else ''}"
+        elif self.block.type == BlockType.QUEUE_MUSIC:
+            music = params.get("music_file", "")
+            return f"queue music: {music}" if music else ""
+        elif self.block.type == BlockType.QUEUE_SOUND:
+            sound = params.get("sound_file", "")
+            return f"queue sound: {sound}" if sound else ""
+        elif self.block.type == BlockType.RETURN:
+            return "return"
         
         return ""
     
