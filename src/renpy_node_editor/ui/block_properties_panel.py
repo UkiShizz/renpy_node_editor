@@ -13,7 +13,7 @@ from PySide6.QtGui import QFont
 from renpy_node_editor.core.model import Block, BlockType
 from renpy_node_editor.ui.tooltips import get_parameter_tooltip
 
-# Стандартные переходы Ren'Py
+# Стандартные переходы Ren'Py (https://www.renpy.org/doc/html/transitions.html)
 RENPY_TRANSITIONS = [
     "dissolve", "fade", "pixellate", "move",
     "moveinleft", "moveinright", "moveintop", "moveinbottom",
@@ -27,32 +27,36 @@ RENPY_TRANSITIONS = [
     "circlewipe", "alphadissolve", "size", "push", "pull"
 ]
 
-# Стандартные позиции для at
+# Стандартные позиции для at (https://www.renpy.org/doc/html/displaying_images.html#position-transforms)
 RENPY_POSITIONS = [
     "left", "right", "center", "truecenter",
     "topleft", "topright", "topcenter",
     "bottomleft", "bottomright", "bottomcenter"
 ]
 
-# Стандартные переходы Ren'Py
-RENPY_TRANSITIONS = [
-    "dissolve", "fade", "pixellate", "move",
-    "moveinleft", "moveinright", "moveintop", "moveinbottom",
-    "moveoutleft", "moveoutright", "moveouttop", "moveoutbottom",
-    "zoomin", "zoomout", "vpunch", "hpunch",
-    "blinds", "squares",
-    "wipeleft", "wiperight", "wipeup", "wipedown",
-    "slideleft", "slideright", "slideup", "slidedown",
-    "pushleft", "pushright", "pushup", "pushdown",
-    "irisin", "irisout", "circleirisin", "circleirisout",
-    "circlewipe", "alphadissolve", "size", "push", "pull"
+# Стандартные слои Ren'Py (https://www.renpy.org/doc/html/displaying_images.html#layers)
+RENPY_LAYERS = [
+    "master", "transient", "screens", "overlay"
 ]
 
-# Стандартные позиции для at
-RENPY_POSITIONS = [
-    "left", "right", "center", "truecenter",
-    "topleft", "topright", "topcenter",
-    "bottomleft", "bottomright", "bottomcenter"
+# Стандартные фоны для scene
+RENPY_BACKGROUNDS = [
+    "black", "white"
+]
+
+# Поддерживаемые форматы аудио файлов
+AUDIO_FORMATS = [
+    ".ogg", ".mp3", ".wav", ".opus"
+]
+
+# Поддерживаемые форматы изображений
+IMAGE_FORMATS = [
+    ".png", ".jpg", ".jpeg", ".webp", ".gif"
+]
+
+# Типы данных для переменных
+VARIABLE_TYPES = [
+    "int", "float", "str", "bool", "list", "dict"
 ]
 
 
@@ -262,8 +266,8 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.LABEL:
             self._add_text_field("label", "Имя метки:", "")
         elif block_type == BlockType.SCENE:
-            self._add_text_field("background", "Фон:", "black")
-            self._add_text_field("layer", "Слой (опционально):", "")
+            self._add_combo_field("background", "Фон:", RENPY_BACKGROUNDS, "black")
+            self._add_combo_field("layer", "Слой (опционально):", RENPY_LAYERS, "")
             self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.SHOW:
             self._add_text_field("character", "Персонаж/Изображение:", "")
@@ -271,11 +275,11 @@ class BlockPropertiesPanel(QWidget):
             self._add_combo_field("at", "Позиция (опционально):", RENPY_POSITIONS, "")
             self._add_text_field("behind", "Behind (опционально):", "")
             self._add_text_field("zorder", "Z-order (опционально):", "")
-            self._add_text_field("layer", "Слой (опционально):", "")
+            self._add_combo_field("layer", "Слой (опционально):", RENPY_LAYERS, "")
             self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.HIDE:
             self._add_text_field("character", "Персонаж:", "")
-            self._add_text_field("layer", "Слой (опционально):", "")
+            self._add_combo_field("layer", "Слой (опционально):", RENPY_LAYERS, "")
             self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.VOICE:
             self._add_text_field("voice_file", "Файл голоса:", "")
