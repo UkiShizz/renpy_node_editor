@@ -41,14 +41,14 @@ def save_settings(settings: Dict[str, Any]) -> None:
         pass  # Ignore save errors
 
 
-def get_splitter_sizes() -> Optional[list[int]]:
+def get_splitter_sizes(splitter_name: str = "main") -> Optional[list[int]]:
     """Get saved splitter sizes"""
     settings = load_settings()
-    return settings.get("splitter_sizes")
+    return settings.get(f"splitter_sizes_{splitter_name}")
 
 
-def save_splitter_sizes(sizes: list[int]) -> None:
+def save_splitter_sizes(sizes: list[int], splitter_name: str = "main") -> None:
     """Save splitter sizes"""
     settings = load_settings()
-    settings["splitter_sizes"] = sizes
+    settings[f"splitter_sizes_{splitter_name}"] = sizes
     save_settings(settings)

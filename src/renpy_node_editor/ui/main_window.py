@@ -154,28 +154,39 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(8, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # Панель управления сценами
+        # Панель управления сценами (фиксированная сверху)
         self.scene_manager = SceneManagerPanel(self)
         self.scene_manager.scene_selected.connect(self._on_scene_selected)
         right_layout.addWidget(self.scene_manager, 0)
+
+        # Вертикальный сплиттер для палитры, превью и свойств
+        self.right_splitter = QSplitter(Qt.Vertical, self)
+        right_layout.addWidget(self.right_splitter, 1)
 
         # Палитра блоков
         palette_label = QLabel("📦 Блоки", self)
         palette_label.setAlignment(Qt.AlignCenter)
         palette_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
         palette_label.setFont(palette_font)
-        right_layout.addWidget(palette_label)
-
+        
         self.block_palette = BlockPalette(self)
-        right_layout.addWidget(self.block_palette, 1)
+        
+        palette_container = QWidget(self)
+        palette_layout = QVBoxLayout(palette_container)
+        palette_layout.setContentsMargins(0, 0, 0, 0)
+        palette_layout.setSpacing(0)
+        palette_layout.addWidget(palette_label)
+        palette_layout.addWidget(self.block_palette)
+        
+        self.right_splitter.addWidget(palette_container)
 
         # Превью кода
         self.preview_panel = PreviewPanel(self)
-        right_layout.addWidget(self.preview_panel, 1)
+        self.right_splitter.addWidget(self.preview_panel)
         
         # Панель свойств блока
         self.properties_panel = BlockPropertiesPanel(self)
-        right_layout.addWidget(self.properties_panel, 1)
+        self.right_splitter.addWidget(self.properties_panel)
 
         self.main_splitter.addWidget(right_container)
         
@@ -190,7 +201,12 @@ class MainWindow(QMainWindow):
         self._load_splitter_sizes()
         
         # Сохраняем пропорции при изменении
-        self.main_splitter.splitterMoved.connect(self._on_splitter_moved)
+        self.main_splitter.splitterMoved.connect(
+            lambda pos, index: self._on_splitter_moved("main", pos, index)
+        )
+        self.right_splitter.splitterMoved.connect(
+            lambda pos, index: self._on_splitter_moved("right", pos, index)
+        )
 
         self.setCentralWidget(central)
 
@@ -383,7 +399,8 @@ class MainWindow(QMainWindow):
     
     def _load_splitter_sizes(self) -> None:
         """Загрузить сохраненные пропорции панелей"""
-        saved_sizes = get_splitter_sizes()
+        # Загружаем пропорции главного splitter (лево-право)
+        saved_sizes = get_splitter_sizes("main")
         if saved_sizes and len(saved_sizes) == 2:
             # Устанавливаем размеры только если они валидны
             if all(s > 0 for s in saved_sizes):
@@ -396,9 +413,31 @@ class MainWindow(QMainWindow):
             # Значения по умолчанию
             self.main_splitter.setStretchFactor(0, 3)
             self.main_splitter.setStretchFactor(1, 2)
+        
+        # Загружаем пропорции правого splitter (палитра-превью-свойства)
+        saved_right_sizes = get_splitter_sizes("right")
+        if saved_right_sizes and len(saved_right_sizes) == 3:
+            # Устанавливаем размеры только если они валидны
+            if all(s > 0 for s in saved_right_sizes):
+                self.right_splitter.setSizes(saved_right_sizes)
+            else:
+                # Значения по умолчанию (равномерное распределение)
+                self.right_splitter.setStretchFactor(0, 1)
+                self.right_splitter.setStretchFactor(1, 1)
+                self.right_splitter.setStretchFactor(2, 1)
+        else:
+            # Значения по умолчанию (равномерное распределение)
+            self.right_splitter.setStretchFactor(0, 1)
+            self.right_splitter.setStretchFactor(1, 1)
+            self.right_splitter.setStretchFactor(2, 1)
     
-    def _on_splitter_moved(self, pos: int, index: int) -> None:
+    def _on_splitter_moved(self, splitter_name: str, pos: int, index: int) -> None:
         """Обработчик изменения пропорций панелей"""
-        sizes = self.main_splitter.sizes()
-        if sizes and len(sizes) == 2:
-            save_splitter_sizes(sizes)
+        if splitter_name == "main":
+            sizes = self.main_splitter.sizes()
+            if sizes and len(sizes) == 2:
+                save_splitter_sizes(sizes, "main")
+        elif splitter_name == "right":
+            sizes = self.right_splitter.sizes()
+            if sizes and len(sizes) == 3:
+                save_splitter_sizes(sizes, "right")
