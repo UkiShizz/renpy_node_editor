@@ -192,11 +192,27 @@ class MainWindow(QMainWindow):
         self.main_splitter.addWidget(right_container)
         
         # Connect node selection to properties panel (after both are created)
-        self.node_view.node_scene.node_selection_changed.connect(
-            self.properties_panel.set_block
-        )
+        # Это будет переподключено при пересоздании сцены
+        self._connect_scene_signals()
+        
         # Connect properties saved signal to update node display
         self.properties_panel.properties_saved.connect(self._on_properties_saved)
+    
+    def _connect_scene_signals(self) -> None:
+        """Подключить сигналы сцены к панели свойств"""
+        try:
+            if hasattr(self, 'node_view') and hasattr(self.node_view, 'node_scene'):
+                # Отключаем старые соединения если есть
+                try:
+                    self.node_view.node_scene.node_selection_changed.disconnect()
+                except Exception:
+                    pass
+                # Подключаем новые
+                self.node_view.node_scene.node_selection_changed.connect(
+                    self.properties_panel.set_block
+                )
+        except Exception as e:
+            print(f"Warning: error connecting scene signals: {e}")
         
         # Загружаем сохраненные пропорции
         self._load_splitter_sizes()
@@ -238,20 +254,15 @@ class MainWindow(QMainWindow):
     def _load_project(self, project: Project, scene: Scene) -> None:
         """Загрузить проект и сцену в UI"""
         try:
-            # Временно отключаем сигналы чтобы избежать проблем во время переключения
-            if hasattr(self.node_view, 'node_scene'):
-                self.node_view.node_scene.blockSignals(True)
+            self.scene_manager.set_project(project)
+            self.scene_manager.set_current_scene(scene)
+            self.node_view.set_project_and_scene(project, scene)
             
-            try:
-                self.scene_manager.set_project(project)
-                self.scene_manager.set_current_scene(scene)
-                self.node_view.set_project_and_scene(project, scene)
-                self.preview_panel.clear()
-                self._update_window_title()
-            finally:
-                # Восстанавливаем сигналы
-                if hasattr(self.node_view, 'node_scene'):
-                    self.node_view.node_scene.blockSignals(False)
+            # Переподключаем сигналы после пересоздания сцены
+            self._connect_scene_signals()
+            
+            self.preview_panel.clear()
+            self._update_window_title()
         except Exception as e:
             import traceback
             error_msg = f"Не удалось загрузить проект:\n{str(e)}\n\n{traceback.format_exc()}"
@@ -261,12 +272,6 @@ class MainWindow(QMainWindow):
                 "Ошибка загрузки проекта",
                 error_msg
             )
-            # Восстанавливаем сигналы даже при ошибке
-            try:
-                if hasattr(self.node_view, 'node_scene'):
-                    self.node_view.node_scene.blockSignals(False)
-            except Exception:
-                pass
 
     def _update_window_title(self) -> None:
         name = self._controller.get_project_name()

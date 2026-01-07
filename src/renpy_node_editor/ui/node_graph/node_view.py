@@ -51,13 +51,38 @@ class NodeView(QGraphicsView):
         """Установить проект и сцену - пересоздаем сцену для безопасности"""
         try:
             # Сохраняем текущее состояние view
-            current_center = self.mapToScene(self.viewport().rect().center())
+            try:
+                current_center = self.mapToScene(self.viewport().rect().center())
+            except Exception:
+                current_center = None
             
-            # Создаем новую сцену вместо очистки старой
+            # Полностью отключаем и очищаем старую сцену
             old_scene = self._scene
             
-            # Отключаем старую сцену от view
-            self.setScene(None)
+            if old_scene:
+                try:
+                    # Отключаем все сигналы от старой сцены
+                    old_scene.blockSignals(True)
+                    try:
+                        old_scene.selectionChanged.disconnect()
+                    except Exception:
+                        pass
+                    
+                    # Отключаем старую сцену от view
+                    if self.scene() == old_scene:
+                        self.setScene(None)
+                    
+                    # Очищаем все элементы из старой сцены
+                    try:
+                        old_scene.clear()
+                    except Exception:
+                        pass
+                    
+                    # Удаляем старую сцену
+                    old_scene.setParent(None)
+                    old_scene.deleteLater()
+                except Exception as e:
+                    print(f"Warning: error cleaning up old scene: {e}")
             
             # Создаем новую сцену
             self._scene = NodeScene(self)
@@ -70,30 +95,36 @@ class NodeView(QGraphicsView):
             self.setBackgroundBrush(self._scene.backgroundBrush())
             self.setAcceptDrops(True)
             
-            # Удаляем старую сцену (будет удалена сборщиком мусора)
-            if old_scene:
-                try:
-                    old_scene.deleteLater()
-                except Exception:
-                    pass
+            # Подключаем сигналы новой сцены к свойствам панели
+            # (это будет сделано в main_window, но на всякий случай)
             
             # Устанавливаем проект и сцену в новую сцену
             self._scene.set_project_and_scene(project, scene)
             
             # Восстанавливаем центр view
             try:
-                self.centerOn(current_center)
+                if current_center:
+                    self.centerOn(current_center)
+                else:
+                    self.centerOn(0, 0)
             except Exception:
                 self.centerOn(0, 0)
         except Exception as e:
             import traceback
             print(f"Error in set_project_and_scene: {e}")
             print(traceback.format_exc())
-            # Fallback - просто вызываем метод сцены
+            # Fallback - пытаемся использовать существующую сцену
             try:
-                self._scene.set_project_and_scene(project, scene)
+                if self._scene:
+                    self._scene.set_project_and_scene(project, scene)
             except Exception:
-                pass
+                # Если и это не работает, создаем новую сцену
+                try:
+                    self._scene = NodeScene(self)
+                    self.setScene(self._scene)
+                    self._scene.set_project_and_scene(project, scene)
+                except Exception:
+                    pass
     
     def center_view(self) -> None:
         """Вернуться в центр рабочей области"""
