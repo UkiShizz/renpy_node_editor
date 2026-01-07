@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
 )
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QFont, QColor, QTextCursor
 
 
 class PreviewPanel(QWidget):
@@ -65,7 +65,7 @@ class PreviewPanel(QWidget):
         self._code_view.setPlainText(text)
         # Прокручиваем в начало
         cursor = self._code_view.textCursor()
-        cursor.movePosition(cursor.Start)
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
         self._code_view.setTextCursor(cursor)
 
     def clear(self) -> None:
@@ -73,7 +73,7 @@ class PreviewPanel(QWidget):
 
     def append_log(self, line: str) -> None:
         cursor = self._code_view.textCursor()
-        cursor.movePosition(cursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(line + "\n")
         self._code_view.setTextCursor(cursor)
         self._code_view.ensureCursorVisible()
