@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from renpy_node_editor.core.model import BlockType
+from renpy_node_editor.ui.tooltips import get_block_tooltip
 
 
 MIME_NODE_TYPE = "application/x-renpy-node-type"
@@ -107,6 +108,9 @@ class BlockPalette(QListWidget):
             for block_type in block_types:
                 item = QListWidgetItem(f"  • {block_type.name}")
                 item.setData(Qt.UserRole, block_type.name)
+                # Добавляем подсказку
+                tooltip = get_block_tooltip(block_type)
+                item.setToolTip(tooltip)
                 self.addItem(item)
 
     # ---- drag&drop ----

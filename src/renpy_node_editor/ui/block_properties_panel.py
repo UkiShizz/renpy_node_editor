@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType
+from renpy_node_editor.ui.tooltips import get_parameter_tooltip
 
 
 class BlockPropertiesPanel(QWidget):
@@ -123,6 +124,7 @@ class BlockPropertiesPanel(QWidget):
         self.properties_layout.addWidget(title)
         
         save_button = QPushButton("💾 Сохранить свойства", self)
+        save_button.setToolTip("Сохранить изменения в свойствах блока")
         save_button.clicked.connect(self._on_save)
         self.properties_layout.addWidget(save_button)
         
@@ -248,23 +250,29 @@ class BlockPropertiesPanel(QWidget):
     def _add_text_field(self, key: str, label: str, default: str = "") -> None:
         """Add a text input field for a parameter."""
         label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
         
         input_widget = QLineEdit(self)
         value = self.current_block.params.get(key, default) if self.current_block else default
         input_widget.setText(str(value))
+        input_widget.setToolTip(tooltip)
         self._param_widgets[key] = input_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, input_widget)
 
     def _add_code_field(self, key: str, label: str) -> None:
         """Add a multi-line code input field"""
         label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
         
         code_widget = QTextEdit(self)
         code_widget.setMaximumHeight(150)
         value = self.current_block.params.get(key, "") if self.current_block else ""
         code_widget.setPlainText(str(value))
+        code_widget.setToolTip(tooltip)
         self._param_widgets[key] = code_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, code_widget)
 
@@ -275,12 +283,15 @@ class BlockPropertiesPanel(QWidget):
         if isinstance(value, str):
             value = value.lower() in ("true", "1", "yes", "on")
         checkbox.setChecked(bool(value))
+        tooltip = get_parameter_tooltip(key)
+        checkbox.setToolTip(tooltip)
         self._param_widgets[key] = checkbox
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, checkbox)
 
     def _add_menu_choices(self) -> None:
         """Add UI for managing menu choices"""
         choices_label = QLabel("Варианты меню:", self)
+        choices_label.setToolTip("Список вариантов выбора для меню. Каждый вариант может иметь текст, переход и условие.")
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, choices_label)
         
         choices_list = QListWidget(self)

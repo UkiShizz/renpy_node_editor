@@ -97,10 +97,12 @@ class SceneManagerPanel(QWidget):
         buttons_layout.setSpacing(4)
         
         btn_add = QPushButton("➕ Создать", self)
+        btn_add.setToolTip("Создать новую сцену в проекте")
         btn_add.clicked.connect(self._on_add_scene)
         buttons_layout.addWidget(btn_add)
         
         btn_delete = QPushButton("➖ Удалить", self)
+        btn_delete.setToolTip("Удалить выбранную сцену из проекта")
         btn_delete.clicked.connect(self._on_delete_scene)
         buttons_layout.addWidget(btn_delete)
         
