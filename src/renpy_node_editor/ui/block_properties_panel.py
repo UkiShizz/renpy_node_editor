@@ -5,13 +5,55 @@ import json
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton,
-    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QTextEdit
+    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QTextEdit, QComboBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType
 from renpy_node_editor.ui.tooltips import get_parameter_tooltip
+
+# Стандартные переходы Ren'Py
+RENPY_TRANSITIONS = [
+    "dissolve", "fade", "pixellate", "move",
+    "moveinleft", "moveinright", "moveintop", "moveinbottom",
+    "moveoutleft", "moveoutright", "moveouttop", "moveoutbottom",
+    "zoomin", "zoomout", "vpunch", "hpunch",
+    "blinds", "squares",
+    "wipeleft", "wiperight", "wipeup", "wipedown",
+    "slideleft", "slideright", "slideup", "slidedown",
+    "pushleft", "pushright", "pushup", "pushdown",
+    "irisin", "irisout", "circleirisin", "circleirisout",
+    "circlewipe", "alphadissolve", "size", "push", "pull"
+]
+
+# Стандартные позиции для at
+RENPY_POSITIONS = [
+    "left", "right", "center", "truecenter",
+    "topleft", "topright", "topcenter",
+    "bottomleft", "bottomright", "bottomcenter"
+]
+
+# Стандартные переходы Ren'Py
+RENPY_TRANSITIONS = [
+    "dissolve", "fade", "pixellate", "move",
+    "moveinleft", "moveinright", "moveintop", "moveinbottom",
+    "moveoutleft", "moveoutright", "moveouttop", "moveoutbottom",
+    "zoomin", "zoomout", "vpunch", "hpunch",
+    "blinds", "squares",
+    "wipeleft", "wiperight", "wipeup", "wipedown",
+    "slideleft", "slideright", "slideup", "slidedown",
+    "pushleft", "pushright", "pushup", "pushdown",
+    "irisin", "irisout", "circleirisin", "circleirisout",
+    "circlewipe", "alphadissolve", "size", "push", "pull"
+]
+
+# Стандартные позиции для at
+RENPY_POSITIONS = [
+    "left", "right", "center", "truecenter",
+    "topleft", "topright", "topcenter",
+    "bottomleft", "bottomright", "bottomcenter"
+]
 
 
 class BlockPropertiesPanel(QWidget):
@@ -154,11 +196,11 @@ class BlockPropertiesPanel(QWidget):
             self._add_text_field("who", "Персонаж:", "")
             self._add_text_field("text", "Текст:", "")
             self._add_text_field("expression", "Выражение (опционально):", "")
-            self._add_text_field("at", "Позиция (опционально):", "")
-            self._add_text_field("with_transition", "Переход (опционально):", "")
+            self._add_combo_field("at", "Позиция (опционально):", RENPY_POSITIONS, "")
+            self._add_combo_field("with_transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.NARRATION:
             self._add_text_field("text", "Текст:", "")
-            self._add_text_field("with_transition", "Переход (опционально):", "")
+            self._add_combo_field("with_transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.MENU:
             self._add_text_field("question", "Вопрос:", "")
             self._add_menu_choices()
@@ -176,9 +218,9 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.PAUSE:
             self._add_text_field("duration", "Длительность (сек):", "1.0")
         elif block_type == BlockType.TRANSITION:
-            self._add_text_field("transition", "Название перехода:", "dissolve")
+            self._add_combo_field("transition", "Название перехода:", RENPY_TRANSITIONS, "dissolve")
         elif block_type == BlockType.WITH:
-            self._add_text_field("transition", "Название перехода:", "dissolve")
+            self._add_combo_field("transition", "Название перехода:", RENPY_TRANSITIONS, "dissolve")
         elif block_type == BlockType.SOUND:
             self._add_text_field("sound_file", "Файл звука:", "")
             self._add_text_field("fadein", "Fade in (сек, опционально):", "")
@@ -222,19 +264,19 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.SCENE:
             self._add_text_field("background", "Фон:", "black")
             self._add_text_field("layer", "Слой (опционально):", "")
-            self._add_text_field("transition", "Переход (опционально):", "")
+            self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.SHOW:
             self._add_text_field("character", "Персонаж/Изображение:", "")
             self._add_text_field("expression", "Выражение (опционально):", "")
-            self._add_text_field("at", "Позиция (опционально):", "")
+            self._add_combo_field("at", "Позиция (опционально):", RENPY_POSITIONS, "")
             self._add_text_field("behind", "Behind (опционально):", "")
             self._add_text_field("zorder", "Z-order (опционально):", "")
             self._add_text_field("layer", "Слой (опционально):", "")
-            self._add_text_field("transition", "Переход (опционально):", "")
+            self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.HIDE:
             self._add_text_field("character", "Персонаж:", "")
             self._add_text_field("layer", "Слой (опционально):", "")
-            self._add_text_field("transition", "Переход (опционально):", "")
+            self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.VOICE:
             self._add_text_field("voice_file", "Файл голоса:", "")
         elif block_type == BlockType.CENTER:
@@ -287,6 +329,68 @@ class BlockPropertiesPanel(QWidget):
         checkbox.setToolTip(tooltip)
         self._param_widgets[key] = checkbox
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, checkbox)
+    
+    def _add_combo_field(self, key: str, label: str, options: list[str], default: str = "") -> None:
+        """Add a combo box (dropdown) for a parameter with predefined options."""
+        label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
+        
+        combo = QComboBox(self)
+        combo.setEditable(True)  # Разрешаем ввод своего значения
+        combo.addItem("")  # Пустой вариант для опциональных полей
+        combo.addItems(options)
+        
+        # Устанавливаем текущее значение
+        value = self.current_block.params.get(key, default) if self.current_block else default
+        current_text = str(value) if value else ""
+        
+        # Ищем в списке
+        index = combo.findText(current_text)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        else:
+            # Если значения нет в списке, устанавливаем его как текущий текст
+            combo.setCurrentText(current_text)
+        
+        combo.setToolTip(tooltip)
+        combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2A2A2A;
+                border: 1px solid #3A3A3A;
+                border-radius: 4px;
+                color: #E0E0E0;
+                padding: 4px;
+                min-height: 20px;
+            }
+            QComboBox:hover {
+                border-color: #4A90E2;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #E0E0E0;
+                width: 0;
+                height: 0;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2A2A2A;
+                border: 1px solid #3A3A3A;
+                border-radius: 4px;
+                color: #E0E0E0;
+                selection-background-color: #4A90E2;
+                selection-color: #FFFFFF;
+            }
+        """)
+        
+        self._param_widgets[key] = combo
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, combo)
 
     def _add_menu_choices(self) -> None:
         """Add UI for managing menu choices"""
@@ -477,6 +581,10 @@ class BlockPropertiesPanel(QWidget):
                 self.current_block.params[key] = widget.toPlainText()
             elif isinstance(widget, QCheckBox):
                 self.current_block.params[key] = widget.isChecked()
+            elif isinstance(widget, QComboBox):
+                # Для комбобокса берем текущий текст (может быть выбран из списка или введен вручную)
+                text = widget.currentText()
+                self.current_block.params[key] = text if text else None
         
         # Сохраняем варианты меню
         if "_choices_data" in self._param_widgets:
