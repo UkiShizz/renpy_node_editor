@@ -357,6 +357,20 @@ class NodeItem(QGraphicsRectItem):
             return f"queue sound: {sound}" if sound else ""
         elif self.block.type == BlockType.RETURN:
             return "return"
+        elif self.block.type == BlockType.STYLE:
+            name = params.get("name", "")
+            return f"style {name}" if name else ""
+        elif self.block.type == BlockType.ELIF:
+            condition = params.get("condition", "")
+            return f"elif {condition[:30]}" if condition else "elif ..."
+        elif self.block.type == BlockType.ELSE:
+            return "else"
+        elif self.block.type == BlockType.EXTEND:
+            text = params.get("text", "")
+            return f"extend: {text[:30]}" if text else "extend"
+        elif self.block.type == BlockType.INTERJECT:
+            text = params.get("text", "")
+            return f"interject: {text[:30]}" if text else "interject"
         
         return ""
     

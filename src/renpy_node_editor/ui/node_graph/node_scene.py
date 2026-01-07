@@ -382,15 +382,63 @@ class NodeScene(QGraphicsScene):
         view = self.views()[0] if self.views() else None
         item = self.itemAt(event.scenePos(), view.transform()) if view else None
         
+        # Если клик был на порте или другом дочернем элементе, находим родительский NodeItem
+        if item and not isinstance(item, NodeItem) and not isinstance(item, ConnectionItem):
+            parent = item.parentItem()
+            while parent:
+                if isinstance(parent, NodeItem):
+                    item = parent
+                    break
+                parent = parent.parentItem()
+        
         if isinstance(item, NodeItem):
+            # Выбираем блок если он не выбран
+            if not item.isSelected():
+                self.clearSelection()
+                item.setSelected(True)
+            
             # Контекстное меню для блока
             menu = QMenu()
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #2A2A2A;
+                    border: 2px solid #3A3A3A;
+                    border-radius: 6px;
+                    color: #E0E0E0;
+                    padding: 4px;
+                }
+                QMenu::item {
+                    padding: 8px 24px;
+                    border-radius: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #4A90E2;
+                    color: #FFFFFF;
+                }
+            """)
             delete_action = menu.addAction("🗑️ Удалить блок")
             delete_action.triggered.connect(lambda: self.delete_selected_blocks())
             menu.exec(event.screenPos())
         elif isinstance(item, ConnectionItem):
             # Контекстное меню для связи
             menu = QMenu()
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #2A2A2A;
+                    border: 2px solid #3A3A3A;
+                    border-radius: 6px;
+                    color: #E0E0E0;
+                    padding: 4px;
+                }
+                QMenu::item {
+                    padding: 8px 24px;
+                    border-radius: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #4A90E2;
+                    color: #FFFFFF;
+                }
+            """)
             delete_action = menu.addAction("🗑️ Удалить связь")
             delete_action.triggered.connect(lambda: self.delete_connection(item))
             menu.exec(event.screenPos())

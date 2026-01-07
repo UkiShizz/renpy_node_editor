@@ -354,10 +354,12 @@ class MainWindow(QMainWindow):
     
     def _on_properties_saved(self, block) -> None:
         """Handle properties saved - update the visual representation"""
+        from renpy_node_editor.ui.node_graph.node_item import NodeItem
+        
         scene = self.node_view.node_scene
         # Find the NodeItem for this block and update its display
         for item in scene.items():
-            if hasattr(item, 'block') and item.block.id == block.id:
+            if isinstance(item, NodeItem) and item.block.id == block.id:
                 item.update_display()
                 break
     
