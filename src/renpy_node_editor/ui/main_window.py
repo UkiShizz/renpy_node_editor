@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -217,17 +217,21 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'node_view') and self.node_view and hasattr(self.node_view, 'node_scene'):
                 scene = self.node_view.node_scene
                 if scene:
-                    # Отключаем старые соединения если есть
+                    # Отключаем ВСЕ старые соединения если есть
                     try:
+                        # Отключаем все слоты от сигнала
                         scene.node_selection_changed.disconnect()
                     except Exception:
                         pass
+                    
                     # Подключаем новые
                     scene.node_selection_changed.connect(
                         self.properties_panel.set_block
                     )
         except Exception as e:
             print(f"Warning: error connecting scene signals: {e}")
+            import traceback
+            print(traceback.format_exc())
     
     def _create_default_project(self) -> None:
         """Создать новый чистый проект при старте"""
@@ -260,8 +264,8 @@ class MainWindow(QMainWindow):
             self.scene_manager.set_current_scene(scene)
             self.node_view.set_project_and_scene(project, scene)
             
-            # Переподключаем сигналы после пересоздания сцены
-            self._connect_scene_signals()
+            # Небольшая задержка перед переподключением сигналов, чтобы Qt успел обработать события
+            QTimer.singleShot(10, self._connect_scene_signals)
             
             self.preview_panel.clear()
             self._update_window_title()

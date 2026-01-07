@@ -61,10 +61,17 @@ class NodeView(QGraphicsView):
             
             if old_scene:
                 try:
-                    # Отключаем все сигналы от старой сцены
+                    # Отключаем все сигналы от старой сцены ПЕРЕД отключением от view
                     old_scene.blockSignals(True)
                     try:
+                        # Отключаем все сигналы selectionChanged
                         old_scene.selectionChanged.disconnect()
+                    except Exception:
+                        pass
+                    
+                    try:
+                        # Отключаем сигнал node_selection_changed
+                        old_scene.node_selection_changed.disconnect()
                     except Exception:
                         pass
                     
@@ -74,15 +81,30 @@ class NodeView(QGraphicsView):
                     
                     # Очищаем все элементы из старой сцены
                     try:
+                        # Удаляем все элементы вручную перед clear()
+                        items = list(old_scene.items())
+                        for item in items:
+                            try:
+                                if item.scene() == old_scene:
+                                    old_scene.removeItem(item)
+                            except Exception:
+                                pass
                         old_scene.clear()
                     except Exception:
                         pass
                     
-                    # Удаляем старую сцену
+                    # Удаляем старую сцену - используем deleteLater() и обрабатываем события
                     old_scene.setParent(None)
                     old_scene.deleteLater()
+                    
+                    # Обрабатываем события для немедленного удаления
+                    from PySide6.QtWidgets import QApplication
+                    QApplication.processEvents()
+                    
                 except Exception as e:
                     print(f"Warning: error cleaning up old scene: {e}")
+                    import traceback
+                    print(traceback.format_exc())
             
             # Создаем новую сцену
             self._scene = NodeScene(self)
@@ -94,9 +116,6 @@ class NodeView(QGraphicsView):
             self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
             self.setBackgroundBrush(self._scene.backgroundBrush())
             self.setAcceptDrops(True)
-            
-            # Подключаем сигналы новой сцены к свойствам панели
-            # (это будет сделано в main_window, но на всякий случай)
             
             # Устанавливаем проект и сцену в новую сцену
             self._scene.set_project_and_scene(project, scene)
