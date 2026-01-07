@@ -200,12 +200,28 @@ class NodeItem(QGraphicsRectItem):
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
         if change == QGraphicsItem.ItemPositionHasChanged:
             # обновляем все провода при движении ноды
-            for p in self.inputs + self.outputs:
-                for c in p.connections:
-                    c.update_path()
+            try:
+                # Проверяем, что элемент еще в сцене
+                if not self.scene():
+                    return super().itemChange(change, value)
+                
+                for p in self.inputs + self.outputs:
+                    # Создаем копию списка connections для безопасной итерации
+                    for c in list(p.connections):
+                        try:
+                            # Проверяем, что соединение еще в сцене
+                            if c.scene():
+                                c.update_path()
+                        except (RuntimeError, AttributeError):
+                            # Соединение уже удалено, удаляем из списка
+                            if c in p.connections:
+                                p.connections.remove(c)
 
-            self.block.x = self.pos().x()
-            self.block.y = self.pos().y()
+                self.block.x = self.pos().x()
+                self.block.y = self.pos().y()
+            except Exception:
+                # Игнорируем ошибки при обновлении путей
+                pass
 
         return super().itemChange(change, value)
 

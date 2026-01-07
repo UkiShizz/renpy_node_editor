@@ -66,6 +66,20 @@ class NodeScene(QGraphicsScene):
                 self._drag_connection = None
             self._drag_src_port = None
             
+            # ВАЖНО: Перед clear() нужно вручную очистить все соединения из портов
+            # чтобы избежать проблем с удаленными элементами
+            try:
+                for item in list(self.items()):
+                    if isinstance(item, NodeItem):
+                        # Очищаем соединения из всех портов
+                        for port in item.inputs + item.outputs:
+                            if port and hasattr(port, 'connections'):
+                                # Очищаем список соединений без вызова detach_from
+                                # так как элементы будут удалены clear()
+                                port.connections.clear()
+            except Exception as e:
+                print(f"Warning: error clearing port connections: {e}")
+            
             # Очищаем сцену перед загрузкой новой
             # Временно отключаем сигнал selectionChanged чтобы избежать проблем
             try:
@@ -73,10 +87,27 @@ class NodeScene(QGraphicsScene):
             except Exception:
                 pass
             
-            self.clear()
+            # Очищаем сцену
+            try:
+                self.clear()
+            except Exception as e:
+                print(f"Warning: error in clear(): {e}")
+                # Пытаемся удалить элементы вручную
+                try:
+                    items_to_remove = list(self.items())
+                    for item in items_to_remove:
+                        try:
+                            self.removeItem(item)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             
             # Восстанавливаем сигнал selectionChanged
-            self.selectionChanged.connect(self._on_selection_changed)
+            try:
+                self.selectionChanged.connect(self._on_selection_changed)
+            except Exception:
+                pass
             
             # Устанавливаем новую модель
             self._project = project
@@ -84,10 +115,19 @@ class NodeScene(QGraphicsScene):
 
             # Создаем блоки
             for block in scene.blocks:
-                self._create_node_item_for_block(block)
+                try:
+                    self._create_node_item_for_block(block)
+                except Exception as e:
+                    print(f"Error creating block {block.id}: {e}")
+                    continue
             
             # Создаем связи
-            self._create_connections()
+            try:
+                self._create_connections()
+            except Exception as e:
+                print(f"Error creating connections: {e}")
+                import traceback
+                print(traceback.format_exc())
         except Exception as e:
             # Логируем ошибку для отладки
             import traceback
@@ -106,7 +146,10 @@ class NodeScene(QGraphicsScene):
                     self.selectionChanged.disconnect()
                 except Exception:
                     pass
-                self.clear()
+                try:
+                    self.clear()
+                except Exception:
+                    pass
                 try:
                     self.selectionChanged.connect(self._on_selection_changed)
                 except Exception:
@@ -117,7 +160,10 @@ class NodeScene(QGraphicsScene):
                 print(f"Error in recovery: {e2}")
         finally:
             # Разблокируем сигналы
-            self.blockSignals(False)
+            try:
+                self.blockSignals(False)
+            except Exception:
+                pass
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
         item = NodeItem(block)
