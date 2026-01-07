@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.app_controller import EditorController
-from renpy_node_editor.core.model import Scene
+from renpy_node_editor.core.model import Scene, Project
 from renpy_node_editor.runner.renpy_env import RenpyEnv, default_env
 from renpy_node_editor.runner.renpy_runner import write_project_files, run_project
 from renpy_node_editor.ui.block_palette import BlockPalette
@@ -51,6 +51,7 @@ class MainWindow(QMainWindow):
         self._apply_style()
 
         self._build_ui()
+        self._create_default_project()
         self._update_window_title()
 
     def _apply_style(self) -> None:
@@ -209,6 +210,38 @@ class MainWindow(QMainWindow):
         )
 
         self.setCentralWidget(central)
+    
+    def _create_default_project(self) -> None:
+        """Создать новый чистый проект при старте"""
+        import tempfile
+        import uuid
+        
+        # Создаем временную директорию для проекта
+        temp_dir = Path(tempfile.gettempdir()) / f"renpy_editor_{uuid.uuid4().hex[:8]}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Создаем новый проект
+        project = self._controller.new_project("New Project", temp_dir)
+        
+        # Если в шаблоне нет сцен — создаём базовую
+        if not project.scenes:
+            scene = Scene(id=str(uuid.uuid4()), name="Main Scene", label="start")
+            project.add_scene(scene)
+            # Сохраняем проект с новой сценой
+            self._controller.save_current_project()
+        else:
+            scene = project.scenes[0]
+        
+        # Загружаем проект в UI
+        self._load_project(project, scene)
+    
+    def _load_project(self, project: Project, scene: Scene) -> None:
+        """Загрузить проект и сцену в UI"""
+        self.scene_manager.set_project(project)
+        self.scene_manager.set_current_scene(scene)
+        self.node_view.set_project_and_scene(project, scene)
+        self.preview_panel.clear()
+        self._update_window_title()
 
     def _update_window_title(self) -> None:
         name = self._controller.get_project_name()
@@ -235,16 +268,14 @@ class MainWindow(QMainWindow):
 
         # Если в шаблоне нет сцен — создаём базовую
         if not project.scenes:
-            scene = Scene(id="scene_1", name="Main Scene", label="start")
+            import uuid
+            scene = Scene(id=str(uuid.uuid4()), name="Main Scene", label="start")
             project.add_scene(scene)
+            self._controller.save_current_project()
         else:
             scene = project.scenes[0]
 
-        self.scene_manager.set_project(project)
-        self.scene_manager.set_current_scene(scene)
-        self.node_view.set_project_and_scene(project, scene)
-        self.preview_panel.clear()
-        self._update_window_title()
+        self._load_project(project, scene)
 
     def _on_open_project(self) -> None:
         base_dir = QFileDialog.getExistingDirectory(
@@ -393,9 +424,7 @@ class MainWindow(QMainWindow):
         if not self._controller.project:
             return
         
-        self.scene_manager.set_current_scene(scene)
-        self.node_view.set_project_and_scene(self._controller.project, scene)
-        self.preview_panel.clear()
+        self._load_project(self._controller.project, scene)
     
     def _load_splitter_sizes(self) -> None:
         """Загрузить сохраненные пропорции панелей"""
