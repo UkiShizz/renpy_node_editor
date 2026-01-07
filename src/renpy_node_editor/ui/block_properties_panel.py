@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton
+from PySide6.QtCore import Qt
 from enum import Enum
 
 
