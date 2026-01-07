@@ -7,7 +7,7 @@ from PySide6.QtCore import QRectF, Qt, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent,
-    QGraphicsSceneContextMenuEvent, QMenu, QMessageBox
+    QGraphicsSceneContextMenuEvent, QMenu, QMessageBox, QGraphicsItem
 )
 
 from renpy_node_editor.core.model import Project, Scene, Block, BlockType, Connection, Port, PortDirection
@@ -53,21 +53,48 @@ class NodeScene(QGraphicsScene):
     # ---- binding to model ----
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
-        self.clear()
-        self._project = project
-        self._scene_model = scene
+        """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
+        try:
+            # Очищаем сцену перед загрузкой новой
+            self.clear()
+            
+            self._project = project
+            self._scene_model = scene
 
-        # Создаем блоки
-        for block in scene.blocks:
-            self._create_node_item_for_block(block)
-        
-        # Создаем связи
-        self._create_connections()
+            # Создаем блоки
+            for block in scene.blocks:
+                self._create_node_item_for_block(block)
+            
+            # Создаем связи
+            self._create_connections()
+        except Exception as e:
+            # Логируем ошибку для отладки
+            import traceback
+            print(f"Error in set_project_and_scene: {e}")
+            print(traceback.format_exc())
+            # Пытаемся восстановить состояние
+            if self._scene_model:
+                self.clear()
+                self._project = project
+                self._scene_model = scene
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
         item = NodeItem(block)
         self.addItem(item)
         return item
+    
+    def _find_parent_node_item(self, item: QGraphicsItem) -> Optional[NodeItem]:
+        """Найти родительский NodeItem для элемента (например, порта)"""
+        if isinstance(item, NodeItem):
+            return item
+        
+        parent = item.parentItem()
+        while parent:
+            if isinstance(parent, NodeItem):
+                return parent
+            parent = parent.parentItem()
+        
+        return None
     
     def _create_connections(self) -> None:
         """Создать визуальные связи из модели"""
@@ -102,19 +129,25 @@ class NodeScene(QGraphicsScene):
     def _get_or_create_port_id(self, block: Block, port_item: PortItem) -> str:
         """Получить или создать port_id для порта"""
         if not self._scene_model:
-            return str(id(port_item))
+            import uuid
+            return str(uuid.uuid4())
         
-        # Ищем существующий порт
+        if not block:
+            import uuid
+            return str(uuid.uuid4())
+        
+        # Ищем существующий порт по имени и направлению для этого блока
+        is_output = port_item.is_output
         for port in self._scene_model.ports:
-            if port.node_id == block.id:
-                # Проверяем по направлению и позиции
-                is_output = port_item.is_output
+            if port.node_id == block.id and port.name == port_item.name:
+                # Проверяем по направлению
                 if (port.direction == PortDirection.OUTPUT and is_output) or \
                    (port.direction == PortDirection.INPUT and not is_output):
                     return port.id
         
         # Создаем новый порт
-        port_id = str(id(port_item))
+        import uuid
+        port_id = str(uuid.uuid4())
         port = Port(
             id=port_id,
             node_id=block.id,
@@ -251,12 +284,16 @@ class NodeScene(QGraphicsScene):
             if isinstance(item, PortItem) and not item.is_output:
                 # Создаем связь в модели
                 if self._scene_model:
+                    # Получаем блоки из портов
+                    src_node = self._find_parent_node_item(self._drag_src_port)
+                    dst_node = self._find_parent_node_item(item)
+                    
                     from_port_id = self._get_or_create_port_id(
-                        self._drag_src_port.parentItem().block if isinstance(self._drag_src_port.parentItem(), NodeItem) else None,
+                        src_node.block if src_node else None,
                         self._drag_src_port
                     )
                     to_port_id = self._get_or_create_port_id(
-                        item.parentItem().block if isinstance(item.parentItem(), NodeItem) else None,
+                        dst_node.block if dst_node else None,
                         item
                     )
                     

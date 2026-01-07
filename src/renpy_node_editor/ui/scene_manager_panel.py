@@ -180,6 +180,18 @@ class SceneManagerPanel(QWidget):
         self._project.add_scene(new_scene)
         self._refresh_scenes_list()
         
+        # Устанавливаем новую сцену как текущую
+        self._current_scene = new_scene
+        
+        # Сохраняем проект после добавления сцены
+        # Получаем контроллер через родительское окно
+        parent_window = self.window()
+        if hasattr(parent_window, '_controller'):
+            try:
+                parent_window._controller.save_current_project()
+            except Exception:
+                pass  # Игнорируем ошибки сохранения
+        
         # Автоматически выбираем новую сцену
         self.scene_selected.emit(new_scene)
     

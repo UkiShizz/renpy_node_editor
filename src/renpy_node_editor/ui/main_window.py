@@ -237,11 +237,19 @@ class MainWindow(QMainWindow):
     
     def _load_project(self, project: Project, scene: Scene) -> None:
         """Загрузить проект и сцену в UI"""
-        self.scene_manager.set_project(project)
-        self.scene_manager.set_current_scene(scene)
-        self.node_view.set_project_and_scene(project, scene)
-        self.preview_panel.clear()
-        self._update_window_title()
+        try:
+            self.scene_manager.set_project(project)
+            self.scene_manager.set_current_scene(scene)
+            self.node_view.set_project_and_scene(project, scene)
+            self.preview_panel.clear()
+            self._update_window_title()
+        except Exception as e:
+            import traceback
+            QMessageBox.critical(
+                self,
+                "Ошибка загрузки проекта",
+                f"Не удалось загрузить проект:\n{str(e)}\n\n{traceback.format_exc()}"
+            )
 
     def _update_window_title(self) -> None:
         name = self._controller.get_project_name()
@@ -424,7 +432,23 @@ class MainWindow(QMainWindow):
         if not self._controller.project:
             return
         
-        self._load_project(self._controller.project, scene)
+        # Проверяем, что сцена существует в проекте
+        if scene not in self._controller.project.scenes:
+            # Если сцена не найдена, пытаемся найти её по ID
+            found_scene = self._controller.project.find_scene(scene.id)
+            if not found_scene:
+                return
+            scene = found_scene
+        
+        try:
+            self._load_project(self._controller.project, scene)
+        except Exception as e:
+            import traceback
+            QMessageBox.critical(
+                self,
+                "Ошибка загрузки сцены",
+                f"Не удалось загрузить сцену '{scene.name}':\n{str(e)}\n\n{traceback.format_exc()}"
+            )
     
     def _load_splitter_sizes(self) -> None:
         """Загрузить сохраненные пропорции панелей"""
