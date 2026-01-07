@@ -152,16 +152,16 @@ class MainWindow(QMainWindow):
         right_container = QWidget(self)
         right_layout = QVBoxLayout(right_container)
         right_layout.setContentsMargins(8, 0, 0, 0)
-        right_layout.setSpacing(8)
+        right_layout.setSpacing(0)
 
-        # Панель управления сценами (фиксированная сверху)
-        self.scene_manager = SceneManagerPanel(self)
-        self.scene_manager.scene_selected.connect(self._on_scene_selected)
-        right_layout.addWidget(self.scene_manager, 0)
-
-        # Вертикальный сплиттер для палитры, превью и свойств
+        # Вертикальный сплиттер для всех панелей справа
         self.right_splitter = QSplitter(Qt.Vertical, self)
         right_layout.addWidget(self.right_splitter, 1)
+
+        # Панель управления сценами
+        self.scene_manager = SceneManagerPanel(self)
+        self.scene_manager.scene_selected.connect(self._on_scene_selected)
+        self.right_splitter.addWidget(self.scene_manager)
 
         # Палитра блоков
         palette_label = QLabel("📦 Блоки", self)
@@ -414,22 +414,24 @@ class MainWindow(QMainWindow):
             self.main_splitter.setStretchFactor(0, 3)
             self.main_splitter.setStretchFactor(1, 2)
         
-        # Загружаем пропорции правого splitter (палитра-превью-свойства)
+        # Загружаем пропорции правого splitter (сцены-палитра-превью-свойства)
         saved_right_sizes = get_splitter_sizes("right")
-        if saved_right_sizes and len(saved_right_sizes) == 3:
+        if saved_right_sizes and len(saved_right_sizes) == 4:
             # Устанавливаем размеры только если они валидны
             if all(s > 0 for s in saved_right_sizes):
                 self.right_splitter.setSizes(saved_right_sizes)
             else:
-                # Значения по умолчанию (равномерное распределение)
+                # Значения по умолчанию (сцены меньше, остальные равномерно)
                 self.right_splitter.setStretchFactor(0, 1)
-                self.right_splitter.setStretchFactor(1, 1)
-                self.right_splitter.setStretchFactor(2, 1)
+                self.right_splitter.setStretchFactor(1, 2)
+                self.right_splitter.setStretchFactor(2, 2)
+                self.right_splitter.setStretchFactor(3, 2)
         else:
-            # Значения по умолчанию (равномерное распределение)
+            # Значения по умолчанию (сцены меньше, остальные равномерно)
             self.right_splitter.setStretchFactor(0, 1)
-            self.right_splitter.setStretchFactor(1, 1)
-            self.right_splitter.setStretchFactor(2, 1)
+            self.right_splitter.setStretchFactor(1, 2)
+            self.right_splitter.setStretchFactor(2, 2)
+            self.right_splitter.setStretchFactor(3, 2)
     
     def _on_splitter_moved(self, splitter_name: str, pos: int, index: int) -> None:
         """Обработчик изменения пропорций панелей"""
@@ -439,5 +441,5 @@ class MainWindow(QMainWindow):
                 save_splitter_sizes(sizes, "main")
         elif splitter_name == "right":
             sizes = self.right_splitter.sizes()
-            if sizes and len(sizes) == 3:
+            if sizes and len(sizes) == 4:
                 save_splitter_sizes(sizes, "right")
