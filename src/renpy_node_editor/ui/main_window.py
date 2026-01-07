@@ -23,6 +23,7 @@ from renpy_node_editor.runner.renpy_runner import write_project_files, run_proje
 from renpy_node_editor.ui.block_palette import BlockPalette
 from renpy_node_editor.ui.node_graph.node_view import NodeView
 from renpy_node_editor.ui.preview_panel import PreviewPanel
+from renpy_node_editor.ui.block_properties_panel import BlockPropertiesPanel
 
 
 class MainWindow(QMainWindow):
@@ -106,6 +107,10 @@ class MainWindow(QMainWindow):
         # Превью кода (PreviewPanel вместо QTextEdit)
         self.preview_panel = PreviewPanel(self)
         right_layout.addWidget(self.preview_panel, 1)
+        
+        # Панель свойств блока (BlockPropertiesPanel)
+        self.properties_panel = BlockPropertiesPanel(self)
+        right_layout.addWidget(self.properties_panel, 1)
 
         splitter.addWidget(right_container)
         splitter.setStretchFactor(0, 3)
@@ -231,3 +236,4 @@ class MainWindow(QMainWindow):
             "Запуск",
             f"Игра запущена через Ren'Py.\nscript.rpy: {script_path}",
         )
+
