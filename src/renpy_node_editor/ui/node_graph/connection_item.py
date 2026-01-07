@@ -13,11 +13,12 @@ class ConnectionItem(QGraphicsPathItem):
     - better line style
     """
 
-    def __init__(self, src_port, dst_port=None, parent=None):
+    def __init__(self, src_port, dst_port=None, parent=None, connection_id: str = None):
         super().__init__(parent)
 
         self.src_port = src_port
         self.dst_port = dst_port
+        self.connection_id = connection_id  # ID связи в модели
 
         self.setZValue(-1)
         

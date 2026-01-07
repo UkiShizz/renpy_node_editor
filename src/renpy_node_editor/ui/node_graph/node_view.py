@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QWheelEvent, QMouseEvent, QPainter
+from PySide6.QtGui import QWheelEvent, QMouseEvent, QPainter, QKeyEvent
 from PySide6.QtWidgets import QGraphicsView, QWidget
 
 from renpy_node_editor.core.model import Project, Scene
@@ -103,3 +103,15 @@ class NodeView(QGraphicsView):
             return
 
         super().mouseReleaseEvent(event)
+    
+    # ---- keyboard ----
+    
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # type: ignore[override]
+        """Обработка нажатий клавиш"""
+        if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
+            # Удаляем выбранные блоки
+            self._scene.delete_selected_blocks()
+            event.accept()
+            return
+        
+        super().keyPressEvent(event)
