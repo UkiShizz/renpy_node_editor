@@ -26,6 +26,7 @@ from renpy_node_editor.ui.node_graph.node_view import NodeView
 from renpy_node_editor.ui.preview_panel import PreviewPanel
 from renpy_node_editor.ui.block_properties_panel import BlockPropertiesPanel
 from renpy_node_editor.ui.scene_manager_panel import SceneManagerPanel
+from renpy_node_editor.core.settings import get_splitter_sizes, save_splitter_sizes
 
 
 class MainWindow(QMainWindow):
@@ -133,8 +134,8 @@ class MainWindow(QMainWindow):
         top_bar.addStretch(1)
 
         # Центральный сплиттер: слева ноды, справа палитра+код
-        splitter = QSplitter(Qt.Horizontal, self)
-        main_layout.addWidget(splitter, 1)
+        self.main_splitter = QSplitter(Qt.Horizontal, self)
+        main_layout.addWidget(self.main_splitter, 1)
 
         # Левая часть — нод-редактор
         left_container = QWidget(self)
@@ -145,7 +146,7 @@ class MainWindow(QMainWindow):
         self.node_view = NodeView(self)
         left_layout.addWidget(self.node_view)
 
-        splitter.addWidget(left_container)
+        self.main_splitter.addWidget(left_container)
 
         # Правая часть — палитра + превью кода
         right_container = QWidget(self)
@@ -176,7 +177,7 @@ class MainWindow(QMainWindow):
         self.properties_panel = BlockPropertiesPanel(self)
         right_layout.addWidget(self.properties_panel, 1)
 
-        splitter.addWidget(right_container)
+        self.main_splitter.addWidget(right_container)
         
         # Connect node selection to properties panel (after both are created)
         self.node_view.node_scene.node_selection_changed.connect(
@@ -184,8 +185,12 @@ class MainWindow(QMainWindow):
         )
         # Connect properties saved signal to update node display
         self.properties_panel.properties_saved.connect(self._on_properties_saved)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        
+        # Загружаем сохраненные пропорции
+        self._load_splitter_sizes()
+        
+        # Сохраняем пропорции при изменении
+        self.main_splitter.splitterMoved.connect(self._on_splitter_moved)
 
         self.setCentralWidget(central)
 
@@ -375,3 +380,25 @@ class MainWindow(QMainWindow):
         self.scene_manager.set_current_scene(scene)
         self.node_view.set_project_and_scene(self._controller.project, scene)
         self.preview_panel.clear()
+    
+    def _load_splitter_sizes(self) -> None:
+        """Загрузить сохраненные пропорции панелей"""
+        saved_sizes = get_splitter_sizes()
+        if saved_sizes and len(saved_sizes) == 2:
+            # Устанавливаем размеры только если они валидны
+            if all(s > 0 for s in saved_sizes):
+                self.main_splitter.setSizes(saved_sizes)
+            else:
+                # Значения по умолчанию
+                self.main_splitter.setStretchFactor(0, 3)
+                self.main_splitter.setStretchFactor(1, 2)
+        else:
+            # Значения по умолчанию
+            self.main_splitter.setStretchFactor(0, 3)
+            self.main_splitter.setStretchFactor(1, 2)
+    
+    def _on_splitter_moved(self, pos: int, index: int) -> None:
+        """Обработчик изменения пропорций панелей"""
+        sizes = self.main_splitter.sizes()
+        if sizes and len(sizes) == 2:
+            save_splitter_sizes(sizes)
