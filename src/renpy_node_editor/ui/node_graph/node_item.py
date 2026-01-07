@@ -7,6 +7,7 @@ from PySide6.QtGui import QBrush, QColor, QPen, QPainter, QPainterPath, QFont, Q
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsRectItem, QGraphicsTextItem
 
 from renpy_node_editor.core.model import Block, BlockType
+from renpy_node_editor.core.constants import NODE_WIDTH, NODE_HEIGHT, NODE_CORNER_RADIUS, NODE_HEADER_HEIGHT
 from renpy_node_editor.ui.node_graph.port_item import PortItem
 
 
@@ -73,10 +74,10 @@ class NodeItem(QGraphicsRectItem):
     - better typography
     """
 
-    WIDTH = 200
-    HEIGHT = 90
-    CORNER_RADIUS = 12
-    HEADER_HEIGHT = 32
+    WIDTH = NODE_WIDTH
+    HEIGHT = NODE_HEIGHT
+    CORNER_RADIUS = NODE_CORNER_RADIUS
+    HEADER_HEIGHT = NODE_HEADER_HEIGHT
 
     def __init__(self, block: Block, parent: Optional[QGraphicsItem] = None) -> None:
         super().__init__(parent)

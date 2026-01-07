@@ -27,8 +27,8 @@ class NodeView(QGraphicsView):
 
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setDragMode(QGraphicsView.NoDrag)
-        self.setViewportUpdateMode(QGraphicsView.BoundingRectViewportUpdate)
-        self.setBackgroundBrush(self._scene.backgroundBrush())
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)  # Обновляем весь viewport для сетки
+        # НЕ устанавливаем backgroundBrush здесь - сетка рисуется в Scene
 
         # важно: чтобы события dnd долетали до сцены
         self.setAcceptDrops(True)

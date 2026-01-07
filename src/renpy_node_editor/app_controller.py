@@ -11,7 +11,7 @@ from renpy_node_editor.core.serialization import (
     save_project,
     project_from_dict,
 )
-from renpy_node_editor.core.generator_renpy import generate_renpy_script
+from renpy_node_editor.core.generator import generate_renpy_script
 
 
 @dataclass

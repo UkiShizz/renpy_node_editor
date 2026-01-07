@@ -7,14 +7,11 @@ from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent
 
 from renpy_node_editor.core.model import Project, Scene, Block, BlockType
+from renpy_node_editor.core.constants import GRID_SMALL, GRID_BIG, GRID_SMALL_COLOR, GRID_BIG_COLOR, GRID_CENTER_COLOR, BG_COLOR
 from renpy_node_editor.ui.block_palette import MIME_NODE_TYPE
 from renpy_node_editor.ui.node_graph.node_item import NodeItem
 from renpy_node_editor.ui.node_graph.port_item import PortItem
 from renpy_node_editor.ui.node_graph.connection_item import ConnectionItem
-
-
-GRID_SMALL = 20
-GRID_BIG = 100
 
 
 class NodeScene(QGraphicsScene):
@@ -35,7 +32,7 @@ class NodeScene(QGraphicsScene):
         self._scene_model: Optional[Scene] = None
 
         # Современная темная тема с бесконечной областью
-        self.setBackgroundBrush(QColor("#1E1E1E"))
+        self.setBackgroundBrush(QColor(BG_COLOR))
         self.setItemIndexMethod(QGraphicsScene.NoIndex)
         # Бесконечная рабочая область (очень большой размер)
         self.setSceneRect(-100000, -100000, 200000, 200000)
@@ -64,17 +61,17 @@ class NodeScene(QGraphicsScene):
     # ---- grid ----
 
     def drawBackground(self, painter: QPainter, rect: QRectF) -> None:  # type: ignore[override]
-        # Сначала рисуем базовый фон
-        painter.fillRect(rect, QBrush(QColor("#1E1E1E")))
+        """Отрисовка фона и сетки"""
+        # Рисуем базовый фон
+        painter.fillRect(rect, QBrush(QColor(BG_COLOR)))
         
         painter.setRenderHint(QPainter.Antialiasing, False)
 
-        # Мелкая сетка (более заметная и контрастная)
+        # Мелкая сетка
         left = int(rect.left()) - (int(rect.left()) % GRID_SMALL)
         top = int(rect.top()) - (int(rect.top()) % GRID_SMALL)
 
-        # Более светлый цвет для лучшей видимости
-        painter.setPen(QPen(QColor("#2A2A2A"), 1))
+        painter.setPen(QPen(QColor(GRID_SMALL_COLOR), 1))
         x = left
         while x < rect.right():
             painter.drawLine(x, rect.top(), x, rect.bottom())
@@ -85,8 +82,8 @@ class NodeScene(QGraphicsScene):
             painter.drawLine(rect.left(), y, rect.right(), y)
             y += GRID_SMALL
 
-        # Крупная сетка (более заметная и контрастная)
-        painter.setPen(QPen(QColor("#353535"), 2))
+        # Крупная сетка
+        painter.setPen(QPen(QColor(GRID_BIG_COLOR), 2))
         left_big = int(rect.left()) - (int(rect.left()) % GRID_BIG)
         top_big = int(rect.top()) - (int(rect.top()) % GRID_BIG)
 
@@ -100,9 +97,8 @@ class NodeScene(QGraphicsScene):
             painter.drawLine(rect.left(), y, rect.right(), y)
             y += GRID_BIG
         
-        # Центральные линии (очень заметные)
-        painter.setPen(QPen(QColor("#505050"), 3))
-        # Всегда рисуем центральные линии если они попадают в видимую область
+        # Центральные линии
+        painter.setPen(QPen(QColor(GRID_CENTER_COLOR), 3))
         if rect.left() <= 0 <= rect.right():
             painter.drawLine(0, rect.top(), 0, rect.bottom())
         if rect.top() <= 0 <= rect.bottom():

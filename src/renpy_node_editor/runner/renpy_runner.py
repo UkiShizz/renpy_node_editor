@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from renpy_node_editor.core.model import Project
-from renpy_node_editor.core.generator_renpy import generate_renpy_script
+from renpy_node_editor.core.generator import generate_renpy_script
 from renpy_node_editor.runner.renpy_env import RenpyEnv
 
 
