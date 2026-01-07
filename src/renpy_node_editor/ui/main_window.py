@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -264,8 +264,8 @@ class MainWindow(QMainWindow):
             self.scene_manager.set_current_scene(scene)
             self.node_view.set_project_and_scene(project, scene)
             
-            # Небольшая задержка перед переподключением сигналов, чтобы Qt успел обработать события
-            QTimer.singleShot(10, self._connect_scene_signals)
+            # Переподключаем сигналы сразу после установки сцены
+            self._connect_scene_signals()
             
             self.preview_panel.clear()
             self._update_window_title()
