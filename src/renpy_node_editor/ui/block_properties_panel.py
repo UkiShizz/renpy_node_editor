@@ -1,33 +1,23 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton
 from PySide6.QtCore import Qt
-from enum import Enum
 
-
-class BlockType(Enum):
-    """Enumeration of block types"""
-    SAY = "say"
-    MENU = "menu"
-    IF = "if"
-    JUMP = "jump"
-    CALL = "call"
-    PAUSE = "pause"
-    TRANSITION = "transition"
-    SOUND = "sound"
-    MUSIC = "music"
-    SET_VAR = "set_var"
-    LABEL = "label"
+from renpy_node_editor.core.model import Block, BlockType
 
 
 class BlockPropertiesPanel(QWidget):
     """Panel for editing block properties"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.current_block = None
-        self._param_widgets = {}
+        self.current_block: Optional[Block] = None
+        self._param_widgets: dict[str, QWidget] = {}
         self.init_ui()
 
-    def init_ui(self):
+    def init_ui(self) -> None:
         """Initialize the UI"""
         self.properties_layout = QVBoxLayout()
         
@@ -42,12 +32,12 @@ class BlockPropertiesPanel(QWidget):
         self.properties_layout.addStretch()
         self.setLayout(self.properties_layout)
 
-    def set_block(self, block):
+    def set_block(self, block: Optional[Block]) -> None:
         """Set the block to edit"""
         self.current_block = block
         self._update_properties()
 
-    def _update_properties(self):
+    def _update_properties(self) -> None:
         """Update the properties based on block type"""
         for i in reversed(range(2, self.properties_layout.count())):
             widget = self.properties_layout.itemAt(i).widget()
@@ -60,15 +50,17 @@ class BlockPropertiesPanel(QWidget):
             return
         
         if self.current_block.type == BlockType.SAY:
-            self._add_text_field("character", "Character:", "")
+            self._add_text_field("who", "Character:", "")
+            self._add_text_field("text", "Text:", "")
+        elif self.current_block.type == BlockType.NARRATION:
             self._add_text_field("text", "Text:", "")
         elif self.current_block.type == BlockType.MENU:
-            self._add_text_field("prompt", "Prompt Text:", "What do you choose?")
-            self._add_text_field("options", "Options (comma-separated):", "Option 1, Option 2")
+            self._add_text_field("question", "Question:", "")
+            # Note: menu choices would need a more complex UI
         elif self.current_block.type == BlockType.IF:
             self._add_text_field("condition", "Condition:", "variable == True")
         elif self.current_block.type == BlockType.JUMP:
-            self._add_text_field("label", "Jump to Label:", "")
+            self._add_text_field("target", "Jump to Label:", "")
         elif self.current_block.type == BlockType.CALL:
             self._add_text_field("label", "Call Label:", "")
         elif self.current_block.type == BlockType.PAUSE:
@@ -85,7 +77,19 @@ class BlockPropertiesPanel(QWidget):
             self._add_text_field("variable", "Variable Name:", "")
             self._add_text_field("value", "Value:", "")
         elif self.current_block.type == BlockType.LABEL:
-            self._add_text_field("label_name", "Label Name:", "")
+            self._add_text_field("label", "Label Name:", "")
+        elif self.current_block.type == BlockType.SCENE:
+            self._add_text_field("background", "Background:", "black")
+            self._add_text_field("transition", "Transition (optional):", "")
+        elif self.current_block.type == BlockType.SHOW:
+            self._add_text_field("character", "Character:", "")
+            self._add_text_field("expression", "Expression (optional):", "")
+            self._add_text_field("at", "At (optional):", "")
+        elif self.current_block.type == BlockType.HIDE:
+            self._add_text_field("character", "Character:", "")
+        elif self.current_block.type == BlockType.RETURN:
+            # RETURN has no parameters
+            pass
 
     def _add_text_field(self, key: str, label: str, default: str = "") -> None:
         """Add a text input field for a parameter."""
@@ -109,4 +113,5 @@ class BlockPropertiesPanel(QWidget):
             elif isinstance(widget, QCheckBox):
                 self.current_block.params[key] = widget.isChecked()
         
-        print(f"Block {self.current_block.id} properties saved: {self.current_block.params}")
+        # Properties are saved directly to the block's params dict
+        # The block is part of the scene model, so changes persist

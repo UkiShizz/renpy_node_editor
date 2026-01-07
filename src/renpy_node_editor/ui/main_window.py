@@ -86,6 +86,10 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(0)
 
         self.node_view = NodeView(self)
+        # Connect node selection to properties panel
+        self.node_view.node_scene.node_selection_changed.connect(
+            self.properties_panel.set_block
+        )
         left_layout.addWidget(self.node_view)
 
         splitter.addWidget(left_container)

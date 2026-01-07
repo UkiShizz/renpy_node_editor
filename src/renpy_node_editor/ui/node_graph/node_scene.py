@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import QRectF, Qt, QPointF
+from PySide6.QtCore import QRectF, Qt, QPointF, pyqtSignal
 from PySide6.QtGui import QPainter, QPen, QColor
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent
 
@@ -25,6 +25,9 @@ class NodeScene(QGraphicsScene):
     - accepts drag&drop from BlockPalette
     - supports creating connections with mouse
     """
+    
+    # Signal emitted when a node is selected/deselected
+    node_selection_changed = pyqtSignal(object)  # emits Block or None
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -38,6 +41,9 @@ class NodeScene(QGraphicsScene):
 
         self._drag_connection: Optional[ConnectionItem] = None
         self._drag_src_port: Optional[PortItem] = None
+        
+        # Connect selection changed signal
+        self.selectionChanged.connect(self._on_selection_changed)
 
     # ---- binding to model ----
 
@@ -184,3 +190,18 @@ class NodeScene(QGraphicsScene):
             return
 
         super().mouseReleaseEvent(event)
+    
+    # ---- selection handling ----
+    
+    def _on_selection_changed(self) -> None:
+        """Handle selection changes and emit signal with selected block"""
+        selected_items = self.selectedItems()
+        if selected_items:
+            # Get the first selected item
+            item = selected_items[0]
+            if isinstance(item, NodeItem):
+                self.node_selection_changed.emit(item.block)
+            else:
+                self.node_selection_changed.emit(None)
+        else:
+            self.node_selection_changed.emit(None)
