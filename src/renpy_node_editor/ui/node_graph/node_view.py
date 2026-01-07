@@ -48,7 +48,52 @@ class NodeView(QGraphicsView):
         return self._scene
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
-        self._scene.set_project_and_scene(project, scene)
+        """Установить проект и сцену - пересоздаем сцену для безопасности"""
+        try:
+            # Сохраняем текущее состояние view
+            current_center = self.mapToScene(self.viewport().rect().center())
+            
+            # Создаем новую сцену вместо очистки старой
+            old_scene = self._scene
+            
+            # Отключаем старую сцену от view
+            self.setScene(None)
+            
+            # Создаем новую сцену
+            self._scene = NodeScene(self)
+            self.setScene(self._scene)
+            
+            # Восстанавливаем настройки view
+            self.setRenderHint(QPainter.Antialiasing, True)
+            self.setDragMode(QGraphicsView.NoDrag)
+            self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+            self.setBackgroundBrush(self._scene.backgroundBrush())
+            self.setAcceptDrops(True)
+            
+            # Удаляем старую сцену (будет удалена сборщиком мусора)
+            if old_scene:
+                try:
+                    old_scene.deleteLater()
+                except Exception:
+                    pass
+            
+            # Устанавливаем проект и сцену в новую сцену
+            self._scene.set_project_and_scene(project, scene)
+            
+            # Восстанавливаем центр view
+            try:
+                self.centerOn(current_center)
+            except Exception:
+                self.centerOn(0, 0)
+        except Exception as e:
+            import traceback
+            print(f"Error in set_project_and_scene: {e}")
+            print(traceback.format_exc())
+            # Fallback - просто вызываем метод сцены
+            try:
+                self._scene.set_project_and_scene(project, scene)
+            except Exception:
+                pass
     
     def center_view(self) -> None:
         """Вернуться в центр рабочей области"""

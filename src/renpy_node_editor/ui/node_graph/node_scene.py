@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 import uuid
 
-from PySide6.QtCore import QRectF, Qt, QPointF, Signal, QTimer
+from PySide6.QtCore import QRectF, Qt, QPointF, Signal
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsSceneDragDropEvent, QGraphicsSceneMouseEvent,
@@ -47,10 +47,6 @@ class NodeScene(QGraphicsScene):
         self._drag_connection: Optional[ConnectionItem] = None
         self._drag_src_port: Optional[PortItem] = None
         
-        # Для отложенного выполнения set_project_and_scene
-        self._pending_project: Optional[Project] = None
-        self._pending_scene: Optional[Scene] = None
-        
         # Connect selection changed signal
         self.selectionChanged.connect(self._on_selection_changed)
 
@@ -58,31 +54,12 @@ class NodeScene(QGraphicsScene):
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
-        # Сохраняем параметры для отложенного выполнения
-        self._pending_project = project
-        self._pending_scene = scene
-        
-        # Используем QTimer для отложенного выполнения, чтобы избежать проблем с event loop
-        QTimer.singleShot(10, self._do_set_project_and_scene)
-    
-    def _do_set_project_and_scene(self) -> None:
-        """Фактическое выполнение установки проекта и сцены"""
-        project = self._pending_project
-        scene = self._pending_scene
-        
-        if not project or not scene:
-            return
-        
-        # Полностью блокируем все сигналы и события
-        self.blockSignals(True)
-        
-        # Отключаем все сигналы
+        # Просто устанавливаем напрямую без отложенного выполнения
+        # так как теперь сцена пересоздается в NodeView
         try:
-            self.selectionChanged.disconnect()
-        except Exception:
-            pass
-        
-        try:
+            # Блокируем сигналы
+            self.blockSignals(True)
+            
             # Очищаем состояние перетаскивания
             if self._drag_connection:
                 try:
@@ -93,60 +70,10 @@ class NodeScene(QGraphicsScene):
                 self._drag_connection = None
             self._drag_src_port = None
             
-            # Полностью очищаем все соединения из портов ПЕРЕД удалением элементов
-            items_list = list(self.items())
-            for item in items_list:
-                try:
-                    if isinstance(item, NodeItem):
-                        # Очищаем соединения из всех портов
-                        for port in item.inputs + item.outputs:
-                            if port:
-                                # Очищаем список соединений напрямую
-                                if hasattr(port, 'connections'):
-                                    # Создаем копию списка для безопасной очистки
-                                    connections_copy = list(port.connections)
-                                    port.connections.clear()
-                                    # Пытаемся удалить соединения из сцены
-                                    for conn in connections_copy:
-                                        try:
-                                            if conn and conn.scene() == self:
-                                                self.removeItem(conn)
-                                        except Exception:
-                                            pass
-                except Exception:
-                    pass
-            
-            # Теперь удаляем все элементы (NodeItem и ConnectionItem)
-            # Удаляем в обратном порядке, чтобы сначала удалить дочерние элементы
-            items_to_remove = list(self.items())
-            # Сначала удаляем ConnectionItem
-            for item in items_to_remove:
-                try:
-                    if isinstance(item, ConnectionItem):
-                        if item.scene() == self:
-                            self.removeItem(item)
-                except Exception:
-                    pass
-            
-            # Затем удаляем NodeItem
-            for item in items_to_remove:
-                try:
-                    if isinstance(item, NodeItem):
-                        if item.scene() == self:
-                            self.removeItem(item)
-                except Exception:
-                    pass
-            
             # Устанавливаем новую модель
             self._project = project
             self._scene_model = scene
-
-            # Восстанавливаем сигнал selectionChanged
-            try:
-                self.selectionChanged.connect(self._on_selection_changed)
-            except Exception:
-                pass
-
+            
             # Создаем блоки
             for block in scene.blocks:
                 try:
@@ -163,24 +90,16 @@ class NodeScene(QGraphicsScene):
                 import traceback
                 print(traceback.format_exc())
         except Exception as e:
-            # Логируем ошибку для отладки
             import traceback
-            print(f"Error in _do_set_project_and_scene: {e}")
+            print(f"Error in set_project_and_scene: {e}")
             print(traceback.format_exc())
-            # Пытаемся восстановить состояние
+            # Устанавливаем модель даже при ошибке
             try:
                 self._project = project
                 self._scene_model = scene
-                try:
-                    self.selectionChanged.connect(self._on_selection_changed)
-                except Exception:
-                    pass
-            except Exception as e2:
-                print(f"Error in recovery: {e2}")
+            except Exception:
+                pass
         finally:
-            # Очищаем pending значения
-            self._pending_project = None
-            self._pending_scene = None
             # Разблокируем сигналы
             try:
                 self.blockSignals(False)
