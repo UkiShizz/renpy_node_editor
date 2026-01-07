@@ -55,9 +55,19 @@ class NodeScene(QGraphicsScene):
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
         try:
+            # Очищаем состояние перетаскивания перед очисткой сцены
+            if self._drag_connection:
+                try:
+                    self.removeItem(self._drag_connection)
+                except Exception:
+                    pass
+                self._drag_connection = None
+            self._drag_src_port = None
+            
             # Очищаем сцену перед загрузкой новой
             self.clear()
             
+            # Устанавливаем новую модель
             self._project = project
             self._scene_model = scene
 
@@ -73,10 +83,19 @@ class NodeScene(QGraphicsScene):
             print(f"Error in set_project_and_scene: {e}")
             print(traceback.format_exc())
             # Пытаемся восстановить состояние
-            if self._scene_model:
+            try:
+                if self._drag_connection:
+                    try:
+                        self.removeItem(self._drag_connection)
+                    except Exception:
+                        pass
+                    self._drag_connection = None
+                self._drag_src_port = None
                 self.clear()
                 self._project = project
                 self._scene_model = scene
+            except Exception:
+                pass
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
         item = NodeItem(block)
@@ -103,28 +122,53 @@ class NodeScene(QGraphicsScene):
         
         # Создаем маппинг port_id -> PortItem
         port_items: dict[str, PortItem] = {}
-        for item in self.items():
-            if isinstance(item, NodeItem):
-                for port in item.inputs + item.outputs:
-                    # Нужно найти port_id для этого порта
-                    # Для этого создадим порты в модели если их нет
-                    port_id = self._get_or_create_port_id(item.block, port)
-                    port_items[port_id] = port
-        
-        # Создаем связи
-        for conn in self._scene_model.connections:
-            src_port_item = port_items.get(conn.from_port_id)
-            dst_port_item = port_items.get(conn.to_port_id)
+        try:
+            for item in self.items():
+                if isinstance(item, NodeItem):
+                    # Проверяем, что блок еще существует в модели
+                    if not self._scene_model.find_block(item.block.id):
+                        continue
+                    
+                    for port in item.inputs + item.outputs:
+                        # Проверяем, что порт еще существует
+                        if not port or not port.scene():
+                            continue
+                        
+                        # Нужно найти port_id для этого порта
+                        # Для этого создадим порты в модели если их нет
+                        try:
+                            port_id = self._get_or_create_port_id(item.block, port)
+                            port_items[port_id] = port
+                        except Exception as e:
+                            print(f"Error creating port_id: {e}")
+                            continue
             
-            if src_port_item and dst_port_item:
-                connection_item = ConnectionItem(
-                    src_port=src_port_item,
-                    dst_port=dst_port_item,
-                    connection_id=conn.id
-                )
-                self.addItem(connection_item)
-                src_port_item.add_connection(connection_item)
-                dst_port_item.add_connection(connection_item)
+            # Создаем связи
+            for conn in self._scene_model.connections:
+                src_port_item = port_items.get(conn.from_port_id)
+                dst_port_item = port_items.get(conn.to_port_id)
+                
+                if src_port_item and dst_port_item:
+                    # Проверяем, что порты еще в сцене
+                    if not src_port_item.scene() or not dst_port_item.scene():
+                        continue
+                    
+                    try:
+                        connection_item = ConnectionItem(
+                            src_port=src_port_item,
+                            dst_port=dst_port_item,
+                            connection_id=conn.id
+                        )
+                        self.addItem(connection_item)
+                        src_port_item.add_connection(connection_item)
+                        dst_port_item.add_connection(connection_item)
+                    except Exception as e:
+                        print(f"Error creating connection: {e}")
+                        continue
+        except Exception as e:
+            import traceback
+            print(f"Error in _create_connections: {e}")
+            print(traceback.format_exc())
     
     def _get_or_create_port_id(self, block: Block, port_item: PortItem) -> str:
         """Получить или создать port_id для порта"""
