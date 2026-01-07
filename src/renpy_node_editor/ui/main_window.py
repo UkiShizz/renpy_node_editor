@@ -201,16 +201,18 @@ class MainWindow(QMainWindow):
     def _connect_scene_signals(self) -> None:
         """Подключить сигналы сцены к панели свойств"""
         try:
-            if hasattr(self, 'node_view') and hasattr(self.node_view, 'node_scene'):
-                # Отключаем старые соединения если есть
-                try:
-                    self.node_view.node_scene.node_selection_changed.disconnect()
-                except Exception:
-                    pass
-                # Подключаем новые
-                self.node_view.node_scene.node_selection_changed.connect(
-                    self.properties_panel.set_block
-                )
+            if hasattr(self, 'node_view') and self.node_view and hasattr(self.node_view, 'node_scene'):
+                scene = self.node_view.node_scene
+                if scene:
+                    # Отключаем старые соединения если есть
+                    try:
+                        scene.node_selection_changed.disconnect()
+                    except Exception:
+                        pass
+                    # Подключаем новые
+                    scene.node_selection_changed.connect(
+                        self.properties_panel.set_block
+                    )
         except Exception as e:
             print(f"Warning: error connecting scene signals: {e}")
         
