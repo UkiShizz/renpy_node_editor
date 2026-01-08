@@ -282,13 +282,18 @@ def generate_hide(block: Block, indent: str) -> str:
 
 def generate_image(block: Block, indent: str) -> str:
     """Generate image definition"""
+    from renpy_node_editor.core.generator.main import normalize_variable_name
+    
     name = safe_get_str(block.params, "name")
     path = safe_get_str(block.params, "path")
     
     if not name or not path:
         return ""
     
-    return f"{indent}image {name} = \"{path}\"\n"
+    # Нормализуем имя изображения (не может начинаться с цифры)
+    normalized_name = normalize_variable_name(name)
+    
+    return f"{indent}image {normalized_name} = \"{path}\"\n"
 
 
 def generate_pause(block: Block, indent: str) -> str:
