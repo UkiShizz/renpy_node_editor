@@ -30,7 +30,8 @@ from renpy_node_editor.core.settings import get_splitter_sizes, save_splitter_si
 class MainWindow(QMainWindow):
     """
     Главное окно редактора с современным дизайном:
-    - слева: панель предпросмотра кода (скрываемая) + нод-редактор (NodeView/NodeScene)
+    - слева: панель предпросмотра кода (скрываемая)
+    - центр: нод-редактор (NodeView/NodeScene)
     - справа: палитра блоков, управление сценами и свойства блоков
     - сверху: кнопки управления проектом
     """
@@ -132,33 +133,18 @@ class MainWindow(QMainWindow):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
-        # Центральный сплиттер: слева ноды+превью, справа палитра
+        # Центральный сплиттер: слева превью кода, центр ноды, справа палитра
         self.main_splitter = QSplitter(Qt.Horizontal, self)
         main_layout.addWidget(self.main_splitter, 1)
 
-        # Левая часть — превью кода (скрываемая) + нод-редактор
-        left_container = QWidget(self)
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
-
-        # Сплиттер для левой части (превью сверху, ноды снизу)
-        self.left_splitter = QSplitter(Qt.Vertical, self)
-        left_layout.addWidget(self.left_splitter, 1)
-
-        # Превью кода (по умолчанию скрыто)
+        # Превью кода (слева, по умолчанию скрыто)
         self.preview_panel = PreviewPanel(self)
-        self.left_splitter.addWidget(self.preview_panel)
+        self.main_splitter.addWidget(self.preview_panel)
         self.preview_panel.setVisible(False)  # По умолчанию скрыто
 
-        # Нод-редактор
+        # Нод-редактор (в центре)
         self.node_view = NodeView(self)
-        self.left_splitter.addWidget(self.node_view)
-
-        # Устанавливаем пропорции: превью 0 (скрыто), ноды 1
-        self.left_splitter.setSizes([0, 1])
-
-        self.main_splitter.addWidget(left_container)
+        self.main_splitter.addWidget(self.node_view)
 
         # Правая часть — палитра блоков, управление сценами и свойства
         right_container = QWidget(self)
@@ -210,9 +196,6 @@ class MainWindow(QMainWindow):
         )
         self.right_splitter.splitterMoved.connect(
             lambda pos, index: self._on_splitter_moved("right", pos, index)
-        )
-        self.left_splitter.splitterMoved.connect(
-            lambda pos, index: self._on_splitter_moved("left", pos, index)
         )
 
         self.setCentralWidget(central)
@@ -485,15 +468,23 @@ class MainWindow(QMainWindow):
         
         if checked:
             # Показываем панель и устанавливаем пропорции
-            sizes = self.left_splitter.sizes()
-            if sizes[0] == 0:
-                # Если превью было скрыто, устанавливаем пропорции 1:2
-                total = sum(sizes) if sum(sizes) > 0 else 300
-                self.left_splitter.setSizes([total // 3, total * 2 // 3])
+            sizes = self.main_splitter.sizes()
+            if len(sizes) >= 3 and sizes[0] == 0:
+                # Если превью было скрыто, устанавливаем пропорции для превью:ноды:палитра
+                total = sum(sizes) if sum(sizes) > 0 else 1200
+                self.main_splitter.setSizes([total // 4, total * 2 // 4, total // 4])
+            elif len(sizes) == 2:
+                # Если только ноды и палитра, добавляем превью
+                total = sum(sizes) if sum(sizes) > 0 else 1200
+                self.main_splitter.setSizes([total // 4, total * 2 // 4, total // 4])
         else:
-            # Скрываем панель
-            sizes = self.left_splitter.sizes()
-            self.left_splitter.setSizes([0, sum(sizes)])
+            # Скрываем панель, отдаём всё пространство нодам и палитре
+            sizes = self.main_splitter.sizes()
+            if len(sizes) >= 3:
+                # Перераспределяем пространство между нодами и палитрой
+                node_size = sizes[1] + sizes[0] // 2
+                palette_size = sizes[2] + sizes[0] // 2
+                self.main_splitter.setSizes([0, node_size, palette_size])
     
     def _on_properties_saved(self, block) -> None:
         """Handle properties saved - update the visual representation"""
@@ -554,21 +545,20 @@ class MainWindow(QMainWindow):
     
     def _load_splitter_sizes(self) -> None:
         """Загрузить сохраненные пропорции панелей"""
-        # Загружаем пропорции главного splitter (лево-право)
+        # Загружаем пропорции главного splitter (превью-ноды-палитра)
         saved_sizes = get_splitter_sizes("main")
-        if saved_sizes and len(saved_sizes) == 2 and all(s > 0 for s in saved_sizes):
+        if saved_sizes and len(saved_sizes) == 3 and all(s >= 0 for s in saved_sizes):
             self.main_splitter.setSizes(saved_sizes)
         else:
-            self.main_splitter.setStretchFactor(0, 3)
-            self.main_splitter.setStretchFactor(1, 2)
-        
-        # Загружаем пропорции левого splitter (превью-ноды)
-        saved_left_sizes = get_splitter_sizes("left")
-        if saved_left_sizes and len(saved_left_sizes) == 2 and all(s > 0 for s in saved_left_sizes):
-            self.left_splitter.setSizes(saved_left_sizes)
-        else:
-            # По умолчанию превью скрыто
-            self.left_splitter.setSizes([0, 1])
+            # По умолчанию: превью скрыто (0), ноды занимают больше места
+            # Используем stretch factors для правильного распределения
+            self.main_splitter.setStretchFactor(0, 0)  # Превью скрыто
+            self.main_splitter.setStretchFactor(1, 3)  # Ноды
+            self.main_splitter.setStretchFactor(2, 2)  # Палитра
+            # Устанавливаем размеры после показа окна (через небольшой таймаут)
+            # Но для начала просто устанавливаем минимальные размеры
+            total_width = self.width() if self.width() > 0 else 1400
+            self.main_splitter.setSizes([0, int(total_width * 0.6), int(total_width * 0.4)])
         
         # Загружаем пропорции правого splitter (сцены-палитра-свойства)
         saved_right_sizes = get_splitter_sizes("right")
@@ -583,12 +573,8 @@ class MainWindow(QMainWindow):
         """Обработчик изменения пропорций панелей"""
         if splitter_name == "main":
             sizes = self.main_splitter.sizes()
-            if sizes and len(sizes) == 2:
+            if sizes and len(sizes) == 3:
                 save_splitter_sizes(sizes, "main")
-        elif splitter_name == "left":
-            sizes = self.left_splitter.sizes()
-            if sizes and len(sizes) == 2:
-                save_splitter_sizes(sizes, "left")
         elif splitter_name == "right":
             sizes = self.right_splitter.sizes()
             if sizes and len(sizes) == 3:
