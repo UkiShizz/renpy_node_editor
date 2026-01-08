@@ -190,7 +190,12 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
                 path = block.params.get("path", "")
                 if path:
                     new_path = convert_path(path, "images")
+                    # Принудительно обновляем путь
                     block.params["path"] = new_path
+                    # Отладочный вывод для диагностики
+                    if new_path == path and ("/game/" in path.lower() or "\\game\\" in path.lower()):
+                        import sys
+                        print(f"ERROR: Path not converted! Original: {path}, New: {new_path}", file=sys.stderr)
             
             # SOUND блоки
             elif block.type == BlockType.SOUND:
