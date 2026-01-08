@@ -135,33 +135,39 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         if not old_path:
             return old_path
         
-        old_path_str = str(old_path).strip()
+        old_path_str = str(old_path).strip().replace("\\", "/")
         
         # Если путь уже относительный (не абсолютный Windows путь и не Unix абсолютный)
         if not (len(old_path_str) >= 2 and old_path_str[1] == ":") and not old_path_str.startswith("/"):
-            return old_path_str.replace("\\", "/")
+            return old_path_str
         
-        # Это абсолютный путь - пытаемся вычислить относительный от game_dir
+        # Это абсолютный путь - ищем "/game/" в пути (регистронезависимо)
+        old_path_lower = old_path_str.lower()
+        game_marker = "/game/"
+        
+        if game_marker in old_path_lower:
+            # Находим позицию "/game/" в оригинальном пути (с учетом регистра)
+            game_pos_lower = old_path_lower.find(game_marker)
+            if game_pos_lower != -1:
+                # Берем часть после "/game/" из оригинального пути
+                relative_part = old_path_str[game_pos_lower + len(game_marker):]
+                # Убираем ведущие слеши, если есть
+                relative_part = relative_part.lstrip("/")
+                return relative_part
+        
+        # Если не нашли "/game/", пытаемся через Path
         try:
             old_path_obj = Path(old_path)
-            if not old_path_obj.exists():
-                # Файл не существует - используем имя файла
-                filename = old_path_obj.name
-                if default_subdir:
-                    return f"{default_subdir}/{filename}"
-                return filename
-            
             game_dir_resolved = game_dir.resolve()
-            old_path_resolved = old_path_obj.resolve()
             
             # Пытаемся вычислить относительный путь
-            relative_path = old_path_resolved.relative_to(game_dir_resolved)
-            return str(relative_path).replace("\\", "/")
+            if game_dir_resolved in old_path_obj.resolve().parents:
+                relative_path = old_path_obj.resolve().relative_to(game_dir_resolved)
+                return str(relative_path).replace("\\", "/")
         except (ValueError, RuntimeError, OSError):
-            # Файл не находится внутри game_dir - используем только имя файла
             pass
         
-        # Если не удалось вычислить относительный путь, используем имя файла с подпапкой
+        # Если ничего не помогло, используем имя файла с подпапкой
         filename = Path(old_path).name
         if default_subdir:
             return f"{default_subdir}/{filename}"
@@ -175,7 +181,8 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
                 path = block.params.get("path", "")
                 if path:
                     new_path = convert_path(path, "images")
-                    block.params["path"] = new_path
+                    if new_path != path:  # Только обновляем, если путь изменился
+                        block.params["path"] = new_path
             
             # SOUND блоки
             elif block.type == BlockType.SOUND:
