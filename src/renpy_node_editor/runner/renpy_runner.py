@@ -146,8 +146,32 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     modified_project = deepcopy(project)
     
     # Изменяем метки сцен, если они конфликтуют с существующими
+    # ВАЖНО: метка "start" обязательна для Ren'Py, её нельзя переименовывать!
+    has_start_label = "start" in existing_labels
+    
     for scene in modified_project.scenes:
         original_label = scene.label
+        
+        # Если метка "start" и она уже существует в проекте - не переименовываем
+        # Если метка "start" и её нет в проекте - оставляем как есть (это будет точка входа)
+        if original_label == "start":
+            if has_start_label:
+                # Если start уже есть, переименовываем нашу сцену
+                safe_project_name = project.name.replace(" ", "_").replace("-", "_")
+                safe_scene_name = scene.name.replace(" ", "_").replace("-", "_")
+                new_label = f"{safe_project_name}_{safe_scene_name}"
+                
+                counter = 1
+                while new_label in existing_labels:
+                    new_label = f"{safe_project_name}_{safe_scene_name}_{counter}"
+                    counter += 1
+                
+                scene.label = new_label
+                existing_labels.add(new_label)
+            # Если start нет - оставляем как есть, это будет точка входа
+            continue
+        
+        # Для остальных меток - переименовываем при конфликте
         if original_label in existing_labels:
             # Используем уникальное имя: имя_проекта_имя_сцены
             safe_project_name = project.name.replace(" ", "_").replace("-", "_")
@@ -164,18 +188,12 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
             existing_labels.add(new_label)  # Добавляем в множество, чтобы избежать конфликтов между сценами
     
     # Генерируем и сохраняем код
-    if is_existing and (game_dir / "script.rpy").exists():
-        # Для существующего проекта создаем отдельный файл, чтобы не ломать существующий код
-        safe_name = project.name.replace(" ", "_").replace("-", "_")
-        script_path = game_dir / f"{safe_name}_generated.rpy"
-    else:
-        # Для нового проекта используем script.rpy
-        script_path = game_dir / "script.rpy"
+    script_path = game_dir / "script.rpy"
     
-    # Генерируем код
+    # Генерируем новый код
     generated_code = generate_renpy_script(modified_project)
     
-    # Записываем сгенерированный код в файл
+    # Заменяем script.rpy на сгенерированный код
     with script_path.open("w", encoding="utf-8") as f:
         f.write(generated_code)
     

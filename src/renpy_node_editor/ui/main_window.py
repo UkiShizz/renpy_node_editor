@@ -388,22 +388,20 @@ class MainWindow(QMainWindow):
         is_existing = is_renpy_project(project_path)
         
         if is_existing:
-            # Для существующего проекта создаем отдельный файл
+            # Для существующего проекта объединяем с script.rpy
             script_path = project_path / "game" / "script.rpy"
             if script_path.exists():
-                safe_name = self._controller.get_project_name().replace(" ", "_").replace("-", "_")
-                new_file_name = f"{safe_name}_generated.rpy"
                 reply = QMessageBox.question(
                     self,
                     "Экспорт в существующий проект",
                     f"Выбран существующий проект Ren'Py:\n{project_dir}\n\n"
-                    f"✅ Сгенерированный код будет сохранен в отдельный файл:\n"
-                    f"   game/{new_file_name}\n\n"
-                    f"✅ Ваш существующий script.rpy НЕ будет изменен!\n"
-                    f"✅ Все ваши определения и код останутся нетронутыми.\n\n"
+                    f"⚠️ ВНИМАНИЕ: Файл script.rpy будет полностью заменен!\n"
+                    f"Текущее содержимое script.rpy будет потеряно.\n\n"
+                    f"✅ Будет создан новый script.rpy со сгенерированным кодом.\n"
+                    f"✅ Другие файлы (options.rpy, gui.rpy и т.д.) не будут изменены.\n\n"
                     f"Продолжить?",
                     QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes
+                    QMessageBox.No
                 )
                 if reply == QMessageBox.No:
                     return
@@ -438,28 +436,12 @@ class MainWindow(QMainWindow):
             created_path = self._controller.export_to_renpy_project(project_path)
             
             if is_existing:
-                # Определяем имя созданного файла
                 script_path = created_path / "game" / "script.rpy"
-                if script_path.exists():
-                    # Если script.rpy существует, значит был создан отдельный файл
-                    safe_name = self._controller.get_project_name().replace(" ", "_").replace("-", "_")
-                    generated_file = created_path / "game" / f"{safe_name}_generated.rpy"
-                    if generated_file.exists():
-                        message = (
-                            f"Код успешно экспортирован в проект Ren'Py:\n{created_path}\n\n"
-                            f"✅ Создан файл: {generated_file.name}\n"
-                            f"✅ Ваш script.rpy не изменен!"
-                        )
-                    else:
-                        message = (
-                            f"Код успешно экспортирован в проект Ren'Py:\n{created_path}\n\n"
-                            f"Файл: {script_path}"
-                        )
-                else:
-                    message = (
-                        f"Код успешно экспортирован в проект Ren'Py:\n{created_path}\n\n"
-                        f"Файл: {script_path}"
-                    )
+                message = (
+                    f"Код успешно экспортирован в проект Ren'Py:\n{created_path}\n\n"
+                    f"✅ Файл script.rpy заменен:\n{script_path}\n\n"
+                    f"✅ Создан новый script.rpy со сгенерированным кодом"
+                )
             else:
                 message = (
                     f"Проект Ren'Py успешно создан в:\n{created_path}\n\n"

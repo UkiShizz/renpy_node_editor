@@ -299,7 +299,22 @@ def generate_renpy_script(project: Project) -> str:
         lines.append("define narrator = Character('Narrator')\n\n")
     
     # Generate scenes
+    has_start_label = any(scene.label == "start" for scene in project.scenes)
+    
     for scene in project.scenes:
         lines.append(generate_scene(scene))
+    
+    # Если нет метки start, создаем её как точку входа
+    if not has_start_label and project.scenes:
+        # Используем первую сцену как точку входа
+        lines.append("\n# Main entry point\n")
+        lines.append("label start:\n")
+        first_scene = project.scenes[0]
+        lines.append(f"    jump {first_scene.label}\n")
+    elif not has_start_label:
+        # Если вообще нет сцен, создаем пустую метку start
+        lines.append("\n# Main entry point\n")
+        lines.append("label start:\n")
+        lines.append("    return\n")
     
     return "".join(lines)
