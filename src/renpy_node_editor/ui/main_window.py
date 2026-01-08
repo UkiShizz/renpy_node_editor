@@ -19,8 +19,6 @@ from PySide6.QtGui import QFont
 
 from renpy_node_editor.app_controller import EditorController
 from renpy_node_editor.core.model import Scene, Project
-from renpy_node_editor.runner.renpy_env import RenpyEnv, default_env
-from renpy_node_editor.runner.renpy_runner import write_project_files, run_project
 from renpy_node_editor.ui.block_palette import BlockPalette
 from renpy_node_editor.ui.node_graph.node_view import NodeView
 from renpy_node_editor.ui.preview_panel import PreviewPanel
@@ -32,8 +30,8 @@ from renpy_node_editor.core.settings import get_splitter_sizes, save_splitter_si
 class MainWindow(QMainWindow):
     """
     Главное окно редактора с современным дизайном:
-    - слева: нод-редактор (NodeView/NodeScene)
-    - справа: палитра блоков + панель превью кода
+    - слева: панель предпросмотра кода (скрываемая) + нод-редактор (NodeView/NodeScene)
+    - справа: палитра блоков, управление сценами и свойства блоков
     - сверху: кнопки управления проектом
     """
 
@@ -41,8 +39,6 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._controller = EditorController()
-        # пробуем автодетект SDK, если не найдёт — кнопка запуска будет ругаться
-        self._renpy_env: Optional[RenpyEnv] = default_env()
 
         self.setWindowTitle("RenPy Node Editor")
         self.resize(1400, 800)
@@ -117,39 +113,54 @@ class MainWindow(QMainWindow):
         btn_generate.setToolTip("Сгенерировать Ren'Py код и показать в панели предпросмотра")
         btn_export = QPushButton("📤 Экспорт в Ren'Py", self)
         btn_export.setToolTip("Экспортировать проект в готовый проект Ren'Py (папку)")
-        btn_run = QPushButton("▶️ Запустить в Ren'Py", self)
-        btn_run.setToolTip("Запустить проект в Ren'Py SDK")
         btn_center = QPushButton("🎯 Центр", self)
         btn_center.setToolTip("Вернуться в центр рабочей области (0, 0)")
+        self.btn_toggle_preview = QPushButton("📄 Код", self)
+        self.btn_toggle_preview.setToolTip("Показать/скрыть панель предпросмотра кода")
+        self.btn_toggle_preview.setCheckable(True)
+        self.btn_toggle_preview.setChecked(False)
 
         btn_new.clicked.connect(self._on_new_project)
         btn_open.clicked.connect(self._on_open_project)
         btn_save.clicked.connect(self._on_save_project)
         btn_generate.clicked.connect(self._on_generate_code)
         btn_export.clicked.connect(self._on_export_rpy)
-        btn_run.clicked.connect(self._on_run_project)
         btn_center.clicked.connect(self._on_center_view)
+        self.btn_toggle_preview.toggled.connect(self._on_toggle_preview)
 
-        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_run, btn_center):
+        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_center, self.btn_toggle_preview):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
-        # Центральный сплиттер: слева ноды, справа палитра+код
+        # Центральный сплиттер: слева ноды+превью, справа палитра
         self.main_splitter = QSplitter(Qt.Horizontal, self)
         main_layout.addWidget(self.main_splitter, 1)
 
-        # Левая часть — нод-редактор
+        # Левая часть — превью кода (скрываемая) + нод-редактор
         left_container = QWidget(self)
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
 
+        # Сплиттер для левой части (превью сверху, ноды снизу)
+        self.left_splitter = QSplitter(Qt.Vertical, self)
+        left_layout.addWidget(self.left_splitter, 1)
+
+        # Превью кода (по умолчанию скрыто)
+        self.preview_panel = PreviewPanel(self)
+        self.left_splitter.addWidget(self.preview_panel)
+        self.preview_panel.setVisible(False)  # По умолчанию скрыто
+
+        # Нод-редактор
         self.node_view = NodeView(self)
-        left_layout.addWidget(self.node_view)
+        self.left_splitter.addWidget(self.node_view)
+
+        # Устанавливаем пропорции: превью 0 (скрыто), ноды 1
+        self.left_splitter.setSizes([0, 1])
 
         self.main_splitter.addWidget(left_container)
 
-        # Правая часть — палитра + превью кода
+        # Правая часть — палитра блоков, управление сценами и свойства
         right_container = QWidget(self)
         right_layout = QVBoxLayout(right_container)
         right_layout.setContentsMargins(8, 0, 0, 0)
@@ -180,10 +191,6 @@ class MainWindow(QMainWindow):
         palette_layout.addWidget(self.block_palette)
         
         self.right_splitter.addWidget(palette_container)
-
-        # Превью кода
-        self.preview_panel = PreviewPanel(self)
-        self.right_splitter.addWidget(self.preview_panel)
         
         # Панель свойств блока
         self.properties_panel = BlockPropertiesPanel(self)
@@ -203,6 +210,9 @@ class MainWindow(QMainWindow):
         )
         self.right_splitter.splitterMoved.connect(
             lambda pos, index: self._on_splitter_moved("right", pos, index)
+        )
+        self.left_splitter.splitterMoved.connect(
+            lambda pos, index: self._on_splitter_moved("left", pos, index)
         )
 
         self.setCentralWidget(central)
@@ -350,6 +360,10 @@ class MainWindow(QMainWindow):
             return
 
         self.preview_panel.set_code(code)
+        # Показываем панель предпросмотра, если она скрыта
+        if not self.preview_panel.isVisible():
+            self.btn_toggle_preview.setChecked(True)
+            self._on_toggle_preview(True)
     
     def _on_export_rpy(self) -> None:
         """Экспортировать проект в готовый проект Ren'Py"""
@@ -465,40 +479,21 @@ class MainWindow(QMainWindow):
                 f"Не удалось экспортировать проект:\n{str(e)}",
             )
 
-    def _on_run_project(self) -> None:
-        if not self._controller.project or not self._controller.project_path:
-            QMessageBox.warning(
-                self,
-                "Нет проекта",
-                "Сначала создай или открой проект.",
-            )
-            return
-
-        if self._renpy_env is None or not self._renpy_env.is_valid():
-            QMessageBox.warning(
-                self,
-                "Ren'Py SDK",
-                "Не настроен путь к Ren'Py SDK. "
-                "По умолчанию ищется C:\\RenPy\\renpy-8.3.7. "
-                "Поправь default_sdk_root() в runner/renpy_env.py или _renpy_env в MainWindow.",
-            )
-            return
-
-        project_dir = self._controller.project_path
-        project = self._controller.project
-
-        script_path = write_project_files(project, project_dir)
-        try:
-            run_project(self._renpy_env, project_dir)
-        except RuntimeError as exc:
-            QMessageBox.critical(self, "Ошибка запуска", str(exc))
-            return
-
-        QMessageBox.information(
-            self,
-            "Запуск",
-            f"Игра запущена через Ren'Py.\nscript.rpy: {script_path}",
-        )
+    def _on_toggle_preview(self, checked: bool) -> None:
+        """Показать/скрыть панель предпросмотра кода"""
+        self.preview_panel.setVisible(checked)
+        
+        if checked:
+            # Показываем панель и устанавливаем пропорции
+            sizes = self.left_splitter.sizes()
+            if sizes[0] == 0:
+                # Если превью было скрыто, устанавливаем пропорции 1:2
+                total = sum(sizes) if sum(sizes) > 0 else 300
+                self.left_splitter.setSizes([total // 3, total * 2 // 3])
+        else:
+            # Скрываем панель
+            sizes = self.left_splitter.sizes()
+            self.left_splitter.setSizes([0, sum(sizes)])
     
     def _on_properties_saved(self, block) -> None:
         """Handle properties saved - update the visual representation"""
@@ -567,13 +562,21 @@ class MainWindow(QMainWindow):
             self.main_splitter.setStretchFactor(0, 3)
             self.main_splitter.setStretchFactor(1, 2)
         
-        # Загружаем пропорции правого splitter (сцены-палитра-превью-свойства)
+        # Загружаем пропорции левого splitter (превью-ноды)
+        saved_left_sizes = get_splitter_sizes("left")
+        if saved_left_sizes and len(saved_left_sizes) == 2 and all(s > 0 for s in saved_left_sizes):
+            self.left_splitter.setSizes(saved_left_sizes)
+        else:
+            # По умолчанию превью скрыто
+            self.left_splitter.setSizes([0, 1])
+        
+        # Загружаем пропорции правого splitter (сцены-палитра-свойства)
         saved_right_sizes = get_splitter_sizes("right")
-        if saved_right_sizes and len(saved_right_sizes) == 4 and all(s > 0 for s in saved_right_sizes):
+        if saved_right_sizes and len(saved_right_sizes) == 3 and all(s > 0 for s in saved_right_sizes):
             self.right_splitter.setSizes(saved_right_sizes)
         else:
             # Значения по умолчанию (сцены меньше, остальные равномерно)
-            for i, factor in enumerate((1, 2, 2, 2)):
+            for i, factor in enumerate((1, 2, 2)):
                 self.right_splitter.setStretchFactor(i, factor)
     
     def _on_splitter_moved(self, splitter_name: str, pos: int, index: int) -> None:
@@ -582,7 +585,11 @@ class MainWindow(QMainWindow):
             sizes = self.main_splitter.sizes()
             if sizes and len(sizes) == 2:
                 save_splitter_sizes(sizes, "main")
+        elif splitter_name == "left":
+            sizes = self.left_splitter.sizes()
+            if sizes and len(sizes) == 2:
+                save_splitter_sizes(sizes, "left")
         elif splitter_name == "right":
             sizes = self.right_splitter.sizes()
-            if sizes and len(sizes) == 4:
+            if sizes and len(sizes) == 3:
                 save_splitter_sizes(sizes, "right")
