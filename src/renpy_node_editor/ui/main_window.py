@@ -489,14 +489,24 @@ class MainWindow(QMainWindow):
                 return
             scene = found_scene
         
+        # Проверяем, что это не та же сцена (избегаем лишних перезагрузок)
+        if (hasattr(self, 'node_view') and self.node_view and 
+            hasattr(self.node_view, 'node_scene') and self.node_view.node_scene and
+            hasattr(self.node_view.node_scene, '_scene_model') and 
+            self.node_view.node_scene._scene_model and
+            self.node_view.node_scene._scene_model.id == scene.id):
+            return  # Уже загружена эта сцена
+        
         try:
             self._load_project(self._controller.project, scene)
         except Exception as e:
             import traceback
+            error_msg = f"Не удалось загрузить сцену '{scene.name}':\n{str(e)}\n\n{traceback.format_exc()}"
+            print(error_msg)  # Выводим в консоль для отладки
             QMessageBox.critical(
                 self,
                 "Ошибка загрузки сцены",
-                f"Не удалось загрузить сцену '{scene.name}':\n{str(e)}\n\n{traceback.format_exc()}"
+                error_msg
             )
     
     def _load_splitter_sizes(self) -> None:

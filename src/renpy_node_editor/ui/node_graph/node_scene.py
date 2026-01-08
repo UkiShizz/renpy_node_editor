@@ -55,12 +55,12 @@ class NodeScene(QGraphicsScene):
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
         try:
-            # Блокируем сигналы во время очистки
+            # Блокируем сигналы во время очистки - НЕ отключаем selectionChanged
             self.blockSignals(True)
             
-            # Отключаем сигнал selectionChanged перед очисткой
+            # Очищаем выделение перед очисткой элементов
             try:
-                self.selectionChanged.disconnect()
+                self.clearSelection()
             except Exception:
                 pass
             
@@ -74,53 +74,35 @@ class NodeScene(QGraphicsScene):
                 self._drag_connection = None
             self._drag_src_port = None
             
-            # Безопасно очищаем все элементы
+            # Безопасно очищаем все элементы - используем clear() вместо ручного удаления
             try:
-                # Собираем все элементы
-                items_to_remove = list(self.items())
+                # Сначала разрываем все соединения в модели, чтобы избежать проблем
+                if self._scene_model:
+                    for block in list(self._scene_model.blocks):
+                        for port in list(block.inputs) + list(block.outputs):
+                            for conn in list(port.connections):
+                                try:
+                                    self._scene_model.remove_connection(conn.id)
+                                except Exception:
+                                    pass
                 
-                # Сначала очищаем соединения из портов, чтобы избежать проблем
-                for item in items_to_remove:
-                    if isinstance(item, NodeItem):
-                        for port in item.inputs + item.outputs:
-                            if port and hasattr(port, 'connections'):
-                                # Создаем копию списка для безопасной итерации
-                                connections_copy = list(port.connections) if port.connections else []
-                                for conn in connections_copy:
-                                    try:
-                                        if conn.scene() == self:
-                                            self.removeItem(conn)
-                                    except Exception:
-                                        pass
-                                port.connections.clear()
-                
-                # Удаляем ConnectionItem
-                for item in items_to_remove:
-                    if isinstance(item, ConnectionItem):
-                        try:
-                            if item.scene() == self:
-                                self.removeItem(item)
-                        except Exception:
-                            pass
-                
-                # Удаляем NodeItem (порты удалятся автоматически как дочерние элементы)
-                for item in items_to_remove:
-                    if isinstance(item, NodeItem):
-                        try:
-                            if item.scene() == self:
-                                self.removeItem(item)
-                        except Exception:
-                            pass
+                # Используем clear() - это самый безопасный способ
+                self.clear()
             except Exception as e:
-                print(f"Warning: error clearing items: {e}")
+                print(f"Warning: error clearing scene: {e}")
                 import traceback
                 print(traceback.format_exc())
-            
-            # Восстанавливаем сигнал selectionChanged
-            try:
-                self.selectionChanged.connect(self._on_selection_changed)
-            except Exception:
-                pass
+                # Fallback - пытаемся очистить вручную
+                try:
+                    items = list(self.items())
+                    for item in items:
+                        try:
+                            if item.scene() == self:
+                                self.removeItem(item)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             
             # Устанавливаем новую модель
             self._project = project
