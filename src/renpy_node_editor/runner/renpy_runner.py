@@ -39,6 +39,44 @@ def is_renpy_project(project_dir: Path) -> bool:
     return (project_dir / "game").is_dir()
 
 
+def extract_definitions_from_script(script_path: Path) -> str:
+    """
+    Извлекает определения (define, init, image и т.д.) из существующего script.rpy.
+    Возвращает все строки до первой метки label.
+    
+    Args:
+        script_path: Путь к файлу script.rpy
+        
+    Returns:
+        Строка с определениями (define, init, image и т.д.)
+    """
+    if not script_path.exists():
+        return ""
+    
+    definitions: list[str] = []
+    in_label_section = False
+    
+    try:
+        with script_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                
+                # Проверяем, начинается ли метка label
+                if stripped.startswith("label ") and stripped.endswith(":"):
+                    in_label_section = True
+                    break
+                
+                # Если еще не в секции меток, сохраняем строку
+                if not in_label_section:
+                    definitions.append(line)
+    
+    except Exception:
+        # В случае ошибки возвращаем пустую строку
+        return ""
+    
+    return "".join(definitions)
+
+
 def find_existing_labels(game_dir: Path) -> set[str]:
     """
     Находит все существующие метки в проекте Ren'Py.
@@ -129,11 +167,29 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     # Заменяем существующий script.rpy на сгенерированный код
     script_path = game_dir / "script.rpy"
     
-    code = generate_renpy_script(modified_project)
+    # Извлекаем определения из существующего script.rpy, если он есть
+    existing_definitions = ""
+    if script_path.exists() and is_existing:
+        existing_definitions = extract_definitions_from_script(script_path)
     
-    # Записываем код в script.rpy (заменяем существующий файл, если он есть)
+    # Генерируем новый код
+    generated_code = generate_renpy_script(modified_project)
+    
+    # Объединяем определения и сгенерированный код
+    if existing_definitions:
+        # Убираем пустые строки в конце определений
+        existing_definitions = existing_definitions.rstrip()
+        if existing_definitions:
+            # Добавляем разделитель между определениями и сгенерированным кодом
+            final_code = existing_definitions + "\n\n" + generated_code
+        else:
+            final_code = generated_code
+    else:
+        final_code = generated_code
+    
+    # Записываем объединенный код в script.rpy
     with script_path.open("w", encoding="utf-8") as f:
-        f.write(code)
+        f.write(final_code)
     
     # Создаем базовые файлы только для нового проекта
     if not is_existing:
