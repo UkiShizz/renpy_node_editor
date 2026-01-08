@@ -124,59 +124,34 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
     def convert_path(old_path: str, default_subdir: str = "") -> str:
         """
         Конвертирует абсолютный путь в относительный от game/.
-        
-        Args:
-            old_path: Исходный путь (может быть абсолютным или относительным)
-            default_subdir: Подпапка по умолчанию (images, audio и т.д.)
-        
-        Returns:
-            Относительный путь от game/ с прямыми слешами
+        ПРОСТАЯ ЛОГИКА: ищем "/game/" и берем все после него.
         """
         if not old_path:
             return old_path
         
-        old_path_str = str(old_path).strip().replace("\\", "/")
+        # Нормализуем путь - заменяем все слеши на прямые
+        path_normalized = str(old_path).replace("\\", "/")
         
-        # Если путь уже относительный (не абсолютный Windows путь и не Unix абсолютный)
-        is_absolute = (len(old_path_str) >= 2 and old_path_str[1] == ":") or old_path_str.startswith("/")
-        if not is_absolute:
-            return old_path_str
+        # Если путь уже относительный (не начинается с буквы диска или /), возвращаем как есть
+        if not (len(path_normalized) >= 2 and path_normalized[1] == ":") and not path_normalized.startswith("/"):
+            return path_normalized
         
-        # Это абсолютный путь - ищем "/game/" в пути (регистронезависимо)
-        old_path_lower = old_path_str.lower()
+        # Ищем "/game/" в пути (регистронезависимо)
+        path_lower = path_normalized.lower()
+        game_marker = "/game/"
         
-        # Ищем любой вариант "/game/" или "\game\"
-        markers = ["/game/", "\\game\\", "\\game/", "/game\\"]
-        for marker in markers:
-            marker_lower = marker.lower()
-            if marker_lower in old_path_lower:
-                # Находим позицию маркера в нижнем регистре
-                pos_lower = old_path_lower.find(marker_lower)
-                if pos_lower != -1:
-                    # Берем часть после маркера из оригинального пути
-                    relative_part = old_path_str[pos_lower + len(marker):]
-                    # Убираем ведущие слеши, если есть
-                    relative_part = relative_part.lstrip("/\\")
-                    if relative_part:  # Если что-то осталось
-                        return relative_part.replace("\\", "/")
+        if game_marker in path_lower:
+            # Находим позицию "/game/" в нижнем регистре
+            pos = path_lower.find(game_marker)
+            if pos != -1:
+                # Берем все после "/game/" из оригинального пути
+                result = path_normalized[pos + len(game_marker):]
+                # Убираем ведущие слеши
+                result = result.lstrip("/")
+                if result:
+                    return result
         
-        # Если не нашли "/game/", пытаемся через Path
-        try:
-            old_path_obj = Path(old_path)
-            game_dir_resolved = game_dir.resolve()
-            old_path_resolved = old_path_obj.resolve()
-            
-            # Пытаемся вычислить относительный путь
-            try:
-                relative_path = old_path_resolved.relative_to(game_dir_resolved)
-                return str(relative_path).replace("\\", "/")
-            except ValueError:
-                # Путь не находится внутри game_dir
-                pass
-        except (RuntimeError, OSError):
-            pass
-        
-        # Если ничего не помогло, используем имя файла с подпапкой
+        # Если не нашли "/game/", используем имя файла с подпапкой
         filename = Path(old_path).name
         if default_subdir:
             return f"{default_subdir}/{filename}"
@@ -189,13 +164,17 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
             if block.type == BlockType.IMAGE:
                 path = block.params.get("path", "")
                 if path:
-                    new_path = convert_path(path, "images")
-                    # Принудительно обновляем путь
-                    block.params["path"] = new_path
-                    # Отладочный вывод для диагностики
-                    if new_path == path and ("/game/" in path.lower() or "\\game\\" in path.lower()):
-                        import sys
-                        print(f"ERROR: Path not converted! Original: {path}, New: {new_path}", file=sys.stderr)
+                    # ПРОСТАЯ ЛОГИКА: если путь содержит "/game/", берем все после него
+                    path_str = str(path).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")  # +6 для длины "/game/"
+                        block.params["path"] = new_path
+                    else:
+                        # Если нет "/game/", используем имя файла
+                        filename = Path(path).name
+                        block.params["path"] = f"images/{filename}"
             
             # SOUND блоки
             elif block.type == BlockType.SOUND:
