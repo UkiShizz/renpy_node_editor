@@ -468,6 +468,7 @@ def normalize_variable_name(name: str) -> str:
     """
     Нормализует имя переменной для Ren'Py.
     Имена должны начинаться с буквы или подчеркивания, не с цифры.
+    Поддерживает кириллицу и другие Unicode символы.
     """
     import re
     
@@ -477,16 +478,21 @@ def normalize_variable_name(name: str) -> str:
     # Заменяем пробелы и дефисы на подчеркивания
     normalized = name.replace(" ", "_").replace("-", "_")
     
-    # Убираем все недопустимые символы (оставляем только буквы, цифры и подчеркивания)
-    normalized = re.sub(r'[^a-zA-Z0-9_]', '_', normalized)
+    # Убираем только действительно недопустимые символы
+    # Оставляем буквы (включая кириллицу), цифры и подчеркивания
+    # Python/Ren'Py поддерживает Unicode в именах переменных
+    normalized = re.sub(r'[^\w]', '_', normalized, flags=re.UNICODE)
     
     # Если начинается с цифры, добавляем префикс
     if normalized and normalized[0].isdigit():
         normalized = f"char_{normalized}"
     
     # Если пустое после обработки, используем дефолтное имя
-    if not normalized or (normalized and normalized[0].isdigit()):
+    if not normalized:
+        # Сохраняем исходное имя, заменяя только пробелы
         normalized = f"char_{name.replace(' ', '_')}" if name else "var"
+        # Убираем недопустимые символы
+        normalized = re.sub(r'[^\w]', '_', normalized, flags=re.UNICODE)
     
     # Убираем множественные подчеркивания
     normalized = re.sub(r'_+', '_', normalized)
