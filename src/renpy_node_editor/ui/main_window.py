@@ -129,7 +129,9 @@ class MainWindow(QMainWindow):
         btn_center.clicked.connect(self._on_center_view)
         self.btn_toggle_preview.toggled.connect(self._on_toggle_preview)
 
-        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_center, self.btn_toggle_preview):
+        # Кнопка просмотра кода слева, остальные справа
+        top_bar.addWidget(self.btn_toggle_preview)
+        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_center):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
