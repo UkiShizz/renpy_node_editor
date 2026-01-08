@@ -193,7 +193,8 @@ class MainWindow(QMainWindow):
         
         # Connect node selection to properties panel (after both are created)
         # Это будет переподключено при пересоздании сцены
-        self._connect_scene_signals()
+        # Отложенное подключение сигналов - после установки центрального виджета
+        # self._connect_scene_signals()  # Будет вызвано после setCentralWidget
         
         # Connect properties saved signal to update node display
         self.properties_panel.properties_saved.connect(self._on_properties_saved)
@@ -210,6 +211,9 @@ class MainWindow(QMainWindow):
         )
 
         self.setCentralWidget(central)
+        
+        # Теперь подключаем сигналы после установки центрального виджета
+        self._connect_scene_signals()
     
     def _connect_scene_signals(self) -> None:
         """Подключить сигналы сцены к панели свойств"""
