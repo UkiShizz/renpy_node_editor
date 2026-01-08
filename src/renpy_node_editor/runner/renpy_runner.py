@@ -168,8 +168,11 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
                     path_str = str(path).replace("\\", "/")
                     path_lower = path_str.lower()
                     if "/game/" in path_lower:
-                        pos = path_lower.find("/game/")
-                        new_path = path_str[pos + 6:].lstrip("/")  # +6 для длины "/game/"
+                        # Находим позицию в нижнем регистре
+                        pos_lower = path_lower.find("/game/")
+                        # Берем из оригинального пути (с учетом регистра)
+                        new_path = path_str[pos_lower + 6:].lstrip("/")  # +6 для длины "/game/"
+                        # ПРИНУДИТЕЛЬНО обновляем путь
                         block.params["path"] = new_path
                     else:
                         # Если нет "/game/", используем имя файла
@@ -242,7 +245,23 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     modified_project = deepcopy(project)
     
     # Конвертируем пути к файлам в относительные
+    # ВАЖНО: модифицируем modified_project напрямую
     convert_file_paths_to_relative(modified_project, game_dir)
+    
+    # ПРОВЕРКА: убеждаемся, что пути обновились
+    for scene in modified_project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.IMAGE:
+                path = block.params.get("path", "")
+                if path and ("/game/" in path.lower() or "\\game\\" in path.lower()):
+                    # Если путь все еще содержит /game/, значит что-то не так
+                    # Принудительно конвертируем
+                    path_str = str(path).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")
+                        block.params["path"] = new_path
     
     # Изменяем метки сцен, если они конфликтуют с существующими
     # ВАЖНО: метка "start" обязательна для Ren'Py, её нельзя переименовывать!
