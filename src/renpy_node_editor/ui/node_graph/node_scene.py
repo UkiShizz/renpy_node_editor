@@ -88,7 +88,19 @@ class NodeScene(QGraphicsScene):
             # Безопасно очищаем все элементы
             try:
                 print(f"DEBUG: clearing {len(self.items())} items")
-                # Сначала разрываем все соединения в модели
+                
+                # Сначала очищаем все соединения из портов, чтобы избежать проблем при удалении
+                items = list(self.items())
+                for item in items:
+                    if isinstance(item, NodeItem):
+                        # Отключаем обновление позиции для всех портов
+                        for port in item.inputs + item.outputs:
+                            if port and hasattr(port, 'connections'):
+                                # Очищаем список соединений, но не удаляем сами ConnectionItem
+                                # они будут удалены позже
+                                port.connections.clear()
+                
+                # Разрываем все соединения в модели
                 if self._scene_model:
                     for block in list(self._scene_model.blocks):
                         for port in list(block.inputs) + list(block.outputs):
@@ -98,13 +110,22 @@ class NodeScene(QGraphicsScene):
                                 except Exception as e:
                                     print(f"DEBUG: error removing connection {conn.id}: {e}")
                 
-                # Удаляем элементы в правильном порядке
-                items = list(self.items())
-                # Сначала удаляем ConnectionItem
+                # Удаляем ConnectionItem (теперь порты не будут пытаться их обновить)
                 for item in items:
                     if isinstance(item, ConnectionItem):
                         try:
                             if item.scene() == self:
+                                # Отключаем от портов перед удалением
+                                if hasattr(item, 'src_port') and item.src_port:
+                                    try:
+                                        item.src_port.remove_connection(item)
+                                    except Exception:
+                                        pass
+                                if hasattr(item, 'dst_port') and item.dst_port:
+                                    try:
+                                        item.dst_port.remove_connection(item)
+                                    except Exception:
+                                        pass
                                 self.removeItem(item)
                         except Exception as e:
                             print(f"DEBUG: error removing ConnectionItem: {e}")
