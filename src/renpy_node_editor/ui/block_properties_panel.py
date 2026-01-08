@@ -5,7 +5,8 @@ import json
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton,
-    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QTextEdit, QComboBox
+    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QTextEdit, QComboBox,
+    QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -226,12 +227,12 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.WITH:
             self._add_combo_field("transition", "Название перехода:", RENPY_TRANSITIONS, "dissolve")
         elif block_type == BlockType.SOUND:
-            self._add_text_field("sound_file", "Файл звука:", "")
+            self._add_file_field("sound_file", "Файл звука:", "", "audio")
             self._add_text_field("fadein", "Fade in (сек, опционально):", "")
             self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
             self._add_checkbox("loop", "Зациклить", False)
         elif block_type == BlockType.MUSIC:
-            self._add_text_field("music_file", "Файл музыки:", "")
+            self._add_file_field("music_file", "Файл музыки:", "", "audio")
             self._add_text_field("fadein", "Fade in (сек, опционально):", "")
             self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
             self._add_checkbox("loop", "Зациклить", True)
@@ -240,11 +241,11 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.STOP_SOUND:
             self._add_text_field("fadeout", "Fade out (сек, опционально):", "")
         elif block_type == BlockType.QUEUE_MUSIC:
-            self._add_text_field("music_file", "Файл музыки:", "")
+            self._add_file_field("music_file", "Файл музыки:", "", "audio")
             self._add_text_field("fadein", "Fade in (сек, опционально):", "")
             self._add_checkbox("loop", "Зациклить", False)
         elif block_type == BlockType.QUEUE_SOUND:
-            self._add_text_field("sound_file", "Файл звука:", "")
+            self._add_file_field("sound_file", "Файл звука:", "", "audio")
             self._add_text_field("fadein", "Fade in (сек, опционально):", "")
         elif block_type == BlockType.SET_VAR:
             self._add_text_field("variable", "Имя переменной:", "")
@@ -262,7 +263,7 @@ class BlockPropertiesPanel(QWidget):
             self._add_text_field("display_name", "Отображаемое имя:", "")
         elif block_type == BlockType.IMAGE:
             self._add_text_field("name", "Имя изображения:", "")
-            self._add_text_field("path", "Путь к файлу:", "")
+            self._add_file_field("path", "Путь к файлу:", "", "image")
         elif block_type == BlockType.LABEL:
             self._add_text_field("label", "Имя метки:", "")
         elif block_type == BlockType.SCENE:
@@ -282,7 +283,7 @@ class BlockPropertiesPanel(QWidget):
             self._add_combo_field("layer", "Слой (опционально):", RENPY_LAYERS, "")
             self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.VOICE:
-            self._add_text_field("voice_file", "Файл голоса:", "")
+            self._add_file_field("voice_file", "Файл голоса:", "", "audio")
         elif block_type == BlockType.CENTER:
             self._add_text_field("text", "Текст:", "")
         elif block_type == BlockType.TEXT:
@@ -306,6 +307,67 @@ class BlockPropertiesPanel(QWidget):
         input_widget.setToolTip(tooltip)
         self._param_widgets[key] = input_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, input_widget)
+
+    def _add_file_field(self, key: str, label: str, default: str = "", file_type: str = "all") -> None:
+        """Add a file path input field with a browse button."""
+        label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
+        
+        # Контейнер для поля ввода и кнопки
+        file_container = QHBoxLayout()
+        file_container.setSpacing(4)
+        
+        input_widget = QLineEdit(self)
+        value = self.current_block.params.get(key, default) if self.current_block else default
+        input_widget.setText(str(value))
+        input_widget.setToolTip(tooltip)
+        self._param_widgets[key] = input_widget
+        file_container.addWidget(input_widget, 1)
+        
+        # Кнопка выбора файла
+        browse_btn = QPushButton("📁", self)
+        browse_btn.setToolTip("Выбрать файл")
+        browse_btn.setMaximumWidth(40)
+        browse_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4A90E2;
+                font-size: 12px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: #5BA0F2;
+            }
+            QPushButton:pressed {
+                background-color: #3A80D2;
+            }
+        """)
+        
+        # Определяем фильтры файлов в зависимости от типа
+        if file_type == "audio":
+            file_filter = "Аудио файлы (*.ogg *.mp3 *.wav *.opus);;Все файлы (*.*)"
+        elif file_type == "image":
+            file_filter = "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)"
+        else:
+            file_filter = "Все файлы (*.*)"
+        
+        def on_browse_clicked():
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                f"Выбрать файл для {label}",
+                "",
+                file_filter
+            )
+            if file_path:
+                input_widget.setText(file_path)
+        
+        browse_btn.clicked.connect(on_browse_clicked)
+        file_container.addWidget(browse_btn)
+        
+        file_widget = QWidget(self)
+        file_widget.setLayout(file_container)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, file_widget)
 
     def _add_code_field(self, key: str, label: str) -> None:
         """Add a multi-line code input field"""
