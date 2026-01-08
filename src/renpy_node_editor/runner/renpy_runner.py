@@ -187,36 +187,76 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
             elif block.type == BlockType.SOUND:
                 sound_file = block.params.get("sound_file", "")
                 if sound_file:
-                    new_path = convert_path(sound_file, "audio")
-                    block.params["sound_file"] = new_path
+                    # Простая логика: обрабатываем как текст
+                    path_str = str(sound_file).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")
+                        block.params["sound_file"] = new_path
+                    else:
+                        filename = Path(sound_file).name
+                        block.params["sound_file"] = f"audio/{filename}"
             
             # MUSIC блоки
             elif block.type == BlockType.MUSIC:
                 music_file = block.params.get("music_file", "")
                 if music_file:
-                    new_path = convert_path(music_file, "audio")
-                    block.params["music_file"] = new_path
+                    # Простая логика: обрабатываем как текст
+                    path_str = str(music_file).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")
+                        block.params["music_file"] = new_path
+                    else:
+                        filename = Path(music_file).name
+                        block.params["music_file"] = f"audio/{filename}"
             
             # QUEUE_MUSIC блоки
             elif block.type == BlockType.QUEUE_MUSIC:
                 music_file = block.params.get("music_file", "")
                 if music_file:
-                    new_path = convert_path(music_file, "audio")
-                    block.params["music_file"] = new_path
+                    # Простая логика: обрабатываем как текст
+                    path_str = str(music_file).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")
+                        block.params["music_file"] = new_path
+                    else:
+                        filename = Path(music_file).name
+                        block.params["music_file"] = f"audio/{filename}"
             
             # QUEUE_SOUND блоки
             elif block.type == BlockType.QUEUE_SOUND:
                 sound_file = block.params.get("sound_file", "")
                 if sound_file:
-                    new_path = convert_path(sound_file, "audio")
-                    block.params["sound_file"] = new_path
+                    # Простая логика: обрабатываем как текст
+                    path_str = str(sound_file).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")
+                        block.params["sound_file"] = new_path
+                    else:
+                        filename = Path(sound_file).name
+                        block.params["sound_file"] = f"audio/{filename}"
             
             # VOICE блоки
             elif block.type == BlockType.VOICE:
                 voice_file = block.params.get("voice_file", "")
                 if voice_file:
-                    new_path = convert_path(voice_file, "audio")
-                    block.params["voice_file"] = new_path
+                    # Простая логика: обрабатываем как текст
+                    path_str = str(voice_file).replace("\\", "/")
+                    path_lower = path_str.lower()
+                    if "/game/" in path_lower:
+                        pos = path_lower.find("/game/")
+                        new_path = path_str[pos + 6:].lstrip("/")
+                        block.params["voice_file"] = new_path
+                    else:
+                        filename = Path(voice_file).name
+                        block.params["voice_file"] = f"audio/{filename}"
 
 
 def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
@@ -255,16 +295,29 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     # ПРОВЕРКА: убеждаемся, что пути обновились (на всякий случай еще раз)
     for scene in modified_project.scenes:
         for block in scene.blocks:
+            # IMAGE блоки
             if block.type == BlockType.IMAGE:
                 path = block.params.get("path", "")
                 if path:
-                    # Просто обрабатываем как текст - ищем "/game/" и берем все после
                     path_str = str(path).replace("\\", "/")
                     path_lower = path_str.lower()
                     if "/game/" in path_lower:
                         pos = path_lower.find("/game/")
-                        new_path = path_str[pos + 6:].lstrip("/")  # +6 это длина "/game/"
+                        new_path = path_str[pos + 6:].lstrip("/")
                         block.params["path"] = new_path
+            
+            # SOUND, MUSIC, VOICE блоки
+            elif block.type in (BlockType.SOUND, BlockType.MUSIC, BlockType.QUEUE_MUSIC, BlockType.QUEUE_SOUND, BlockType.VOICE):
+                # Обрабатываем sound_file, music_file, voice_file
+                for param_name in ["sound_file", "music_file", "voice_file"]:
+                    file_path = block.params.get(param_name, "")
+                    if file_path:
+                        path_str = str(file_path).replace("\\", "/")
+                        path_lower = path_str.lower()
+                        if "/game/" in path_lower:
+                            pos = path_lower.find("/game/")
+                            new_path = path_str[pos + 6:].lstrip("/")
+                            block.params[param_name] = new_path
     
     # Изменяем метки сцен, если они конфликтуют с существующими
     # ВАЖНО: метка "start" обязательна для Ren'Py, её нельзя переименовывать!
