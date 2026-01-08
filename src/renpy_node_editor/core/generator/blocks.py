@@ -464,6 +464,43 @@ def generate_python(block: Block, indent: str) -> str:
     return "".join(lines)
 
 
+def normalize_variable_name(name: str) -> str:
+    """
+    Нормализует имя переменной для Ren'Py.
+    Имена должны начинаться с буквы или подчеркивания, не с цифры.
+    """
+    import re
+    
+    if not name:
+        return "var"
+    
+    # Заменяем пробелы и дефисы на подчеркивания
+    normalized = name.replace(" ", "_").replace("-", "_")
+    
+    # Убираем все недопустимые символы (оставляем только буквы, цифры и подчеркивания)
+    normalized = re.sub(r'[^a-zA-Z0-9_]', '_', normalized)
+    
+    # Если начинается с цифры, добавляем префикс
+    if normalized and normalized[0].isdigit():
+        normalized = f"char_{normalized}"
+    
+    # Если пустое после обработки, используем дефолтное имя
+    if not normalized or (normalized and normalized[0].isdigit()):
+        normalized = f"char_{name.replace(' ', '_')}" if name else "var"
+    
+    # Убираем множественные подчеркивания
+    normalized = re.sub(r'_+', '_', normalized)
+    
+    # Убираем подчеркивания в начале и конце
+    normalized = normalized.strip('_')
+    
+    # Если все еще пустое или начинается с цифры, добавляем префикс
+    if not normalized or (normalized and normalized[0].isdigit()):
+        normalized = f"char_{normalized}" if normalized else "var"
+    
+    return normalized
+
+
 def generate_character(block: Block, indent: str) -> str:
     """Generate character definition"""
     name = safe_get_str(block.params, "name")
@@ -472,11 +509,14 @@ def generate_character(block: Block, indent: str) -> str:
     if not name:
         return ""
     
+    # Нормализуем имя переменной (не может начинаться с цифры)
+    normalized_name = normalize_variable_name(name)
+    
     if display_name:
         display_name = display_name.replace("'", "\\'")
-        return f"{indent}define {name} = Character('{display_name}')\n"
+        return f"{indent}define {normalized_name} = Character('{display_name}')\n"
     else:
-        return f"{indent}define {name} = Character(None)\n"
+        return f"{indent}define {normalized_name} = Character(None)\n"
 
 
 def generate_voice(block: Block, indent: str) -> str:
