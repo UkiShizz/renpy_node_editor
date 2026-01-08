@@ -135,27 +135,36 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         if not old_path:
             return old_path
         
-        old_path_obj = Path(old_path).resolve()
-        game_dir_resolved = game_dir.resolve()
+        old_path_str = str(old_path).strip()
         
-        # Если путь уже относительный (не абсолютный), просто конвертируем слеши
-        if not old_path_obj.is_absolute():
-            return old_path.replace("\\", "/")
+        # Если путь уже относительный (не абсолютный Windows путь и не Unix абсолютный)
+        if not (len(old_path_str) >= 2 and old_path_str[1] == ":") and not old_path_str.startswith("/"):
+            return old_path_str.replace("\\", "/")
         
-        # Если путь абсолютный, пытаемся вычислить относительный путь от game_dir
+        # Это абсолютный путь - пытаемся вычислить относительный от game_dir
         try:
-            # Пытаемся вычислить относительный путь от game_dir
-            # Это сработает только если файл находится внутри game_dir
-            relative_path = old_path_obj.relative_to(game_dir_resolved)
+            old_path_obj = Path(old_path)
+            if not old_path_obj.exists():
+                # Файл не существует - используем имя файла
+                filename = old_path_obj.name
+                if default_subdir:
+                    return f"{default_subdir}/{filename}"
+                return filename
+            
+            game_dir_resolved = game_dir.resolve()
+            old_path_resolved = old_path_obj.resolve()
+            
+            # Пытаемся вычислить относительный путь
+            relative_path = old_path_resolved.relative_to(game_dir_resolved)
             return str(relative_path).replace("\\", "/")
-        except (ValueError, RuntimeError):
-            # Файл не находится внутри game_dir - используем только имя файла с подпапкой
+        except (ValueError, RuntimeError, OSError):
+            # Файл не находится внутри game_dir - используем только имя файла
             pass
         
-        # Если файл вне проекта, используем только имя файла с подпапкой по умолчанию
-        filename = old_path_obj.name
+        # Если не удалось вычислить относительный путь, используем имя файла с подпапкой
+        filename = Path(old_path).name
         if default_subdir:
-            return f"{default_subdir}/{filename}".replace("\\", "/")
+            return f"{default_subdir}/{filename}"
         return filename
     
     # Обрабатываем все блоки в сценах
