@@ -135,7 +135,8 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         if not old_path:
             return old_path
         
-        old_path_obj = Path(old_path)
+        old_path_obj = Path(old_path).resolve()
+        game_dir_resolved = game_dir.resolve()
         
         # Если путь уже относительный (не абсолютный), просто конвертируем слеши
         if not old_path_obj.is_absolute():
@@ -143,16 +144,15 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         
         # Если путь абсолютный, пытаемся вычислить относительный путь от game_dir
         try:
-            # Проверяем, находится ли файл внутри проекта Ren'Py
-            if game_dir in old_path_obj.parents or old_path_obj.parent == game_dir:
-                # Файл внутри проекта - вычисляем относительный путь от game_dir
-                relative_path = old_path_obj.relative_to(game_dir)
-                return str(relative_path).replace("\\", "/")
-        except ValueError:
-            # Файл не находится внутри проекта - используем имя файла с подпапкой
+            # Пытаемся вычислить относительный путь от game_dir
+            # Это сработает только если файл находится внутри game_dir
+            relative_path = old_path_obj.relative_to(game_dir_resolved)
+            return str(relative_path).replace("\\", "/")
+        except (ValueError, RuntimeError):
+            # Файл не находится внутри game_dir - используем только имя файла с подпапкой
             pass
         
-        # Если файл вне проекта, используем имя файла с подпапкой по умолчанию
+        # Если файл вне проекта, используем только имя файла с подпапкой по умолчанию
         filename = old_path_obj.name
         if default_subdir:
             return f"{default_subdir}/{filename}".replace("\\", "/")

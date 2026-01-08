@@ -1,4 +1,4 @@
-file:///C:/RenPy/renpy-8.3.7/doc/index.htmlfrom __future__ import annotations
+from __future__ import annotations
 
 import sys
 from pathlib import Path
