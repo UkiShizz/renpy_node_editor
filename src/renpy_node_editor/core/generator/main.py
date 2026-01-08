@@ -359,11 +359,25 @@ def generate_renpy_script(project: Project) -> str:
         normalized_name = normalize_variable_name(name)
         char_name_map[name] = normalized_name
     
+    # Проверяем, есть ли метка start в сценах
+    has_start_label = any(scene.label == "start" for scene in project.scenes)
+    
+    # Если нет метки start, создаем её в начале (после определений, перед сценами)
+    # Это стандартная практика Ren'Py - метка start обычно идет в начале файла
+    if not has_start_label and project.scenes:
+        # Используем первую сцену как точку входа
+        lines.append("\n# Main entry point\n")
+        lines.append("label start:\n")
+        first_scene = project.scenes[0]
+        lines.append(f"    jump {first_scene.label}\n\n")
+    elif not has_start_label:
+        # Если вообще нет сцен, создаем пустую метку start
+        lines.append("\n# Main entry point\n")
+        lines.append("label start:\n")
+        lines.append("    return\n\n")
+    
     # Generate scenes
     for scene in project.scenes:
         lines.append(generate_scene(scene, char_name_map))
-    
-    # Не создаем автоматическую метку start - пользователь должен сам создать сцену с меткой start
-    # Если нет метки start, Ren'Py выдаст ошибку, но это нормально - пользователь должен явно указать точку входа
     
     return "".join(lines)
