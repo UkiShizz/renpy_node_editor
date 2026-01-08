@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
 
-from renpy_node_editor.core.model import Project
+from renpy_node_editor.core.model import Project, Block, BlockType
 from renpy_node_editor.core.generator import generate_renpy_script
 from renpy_node_editor.runner.renpy_env import RenpyEnv
 
@@ -116,6 +116,94 @@ def find_existing_labels(game_dir: Path) -> set[str]:
     return labels
 
 
+def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
+    """
+    Конвертирует абсолютные пути к файлам в относительные от game/.
+    Модифицирует проект in-place. Файлы не копируются.
+    """
+    def convert_path(old_path: str, default_subdir: str = "") -> str:
+        """
+        Конвертирует абсолютный путь в относительный от game/.
+        
+        Args:
+            old_path: Исходный путь (может быть абсолютным или относительным)
+            default_subdir: Подпапка по умолчанию (images, audio и т.д.)
+        
+        Returns:
+            Относительный путь от game/ с прямыми слешами
+        """
+        if not old_path:
+            return old_path
+        
+        old_path_obj = Path(old_path)
+        
+        # Если путь уже относительный (не абсолютный), просто конвертируем слеши
+        if not old_path_obj.is_absolute():
+            return old_path.replace("\\", "/")
+        
+        # Если путь абсолютный, пытаемся вычислить относительный путь от game_dir
+        try:
+            # Проверяем, находится ли файл внутри проекта Ren'Py
+            if game_dir in old_path_obj.parents or old_path_obj.parent == game_dir:
+                # Файл внутри проекта - вычисляем относительный путь от game_dir
+                relative_path = old_path_obj.relative_to(game_dir)
+                return str(relative_path).replace("\\", "/")
+        except ValueError:
+            # Файл не находится внутри проекта - используем имя файла с подпапкой
+            pass
+        
+        # Если файл вне проекта, используем имя файла с подпапкой по умолчанию
+        filename = old_path_obj.name
+        if default_subdir:
+            return f"{default_subdir}/{filename}".replace("\\", "/")
+        return filename
+    
+    # Обрабатываем все блоки в сценах
+    for scene in project.scenes:
+        for block in scene.blocks:
+            # IMAGE блоки
+            if block.type == BlockType.IMAGE:
+                path = block.params.get("path", "")
+                if path:
+                    new_path = convert_path(path, "images")
+                    block.params["path"] = new_path
+            
+            # SOUND блоки
+            elif block.type == BlockType.SOUND:
+                sound_file = block.params.get("sound_file", "")
+                if sound_file:
+                    new_path = convert_path(sound_file, "audio")
+                    block.params["sound_file"] = new_path
+            
+            # MUSIC блоки
+            elif block.type == BlockType.MUSIC:
+                music_file = block.params.get("music_file", "")
+                if music_file:
+                    new_path = convert_path(music_file, "audio")
+                    block.params["music_file"] = new_path
+            
+            # QUEUE_MUSIC блоки
+            elif block.type == BlockType.QUEUE_MUSIC:
+                music_file = block.params.get("music_file", "")
+                if music_file:
+                    new_path = convert_path(music_file, "audio")
+                    block.params["music_file"] = new_path
+            
+            # QUEUE_SOUND блоки
+            elif block.type == BlockType.QUEUE_SOUND:
+                sound_file = block.params.get("sound_file", "")
+                if sound_file:
+                    new_path = convert_path(sound_file, "audio")
+                    block.params["sound_file"] = new_path
+            
+            # VOICE блоки
+            elif block.type == BlockType.VOICE:
+                voice_file = block.params.get("voice_file", "")
+                if voice_file:
+                    new_path = convert_path(voice_file, "audio")
+                    block.params["voice_file"] = new_path
+
+
 def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     """
     Экспортирует проект в существующий или новый проект Ren'Py.
@@ -141,9 +229,12 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     if is_existing:
         existing_labels = find_existing_labels(game_dir)
     
-    # Создаем копию проекта для модификации меток
+    # Создаем копию проекта для модификации меток и путей
     from copy import deepcopy
     modified_project = deepcopy(project)
+    
+    # Конвертируем пути к файлам в относительные и копируем файлы
+    convert_file_paths_to_relative(modified_project, game_dir)
     
     # Изменяем метки сцен, если они конфликтуют с существующими
     # ВАЖНО: метка "start" обязательна для Ren'Py, её нельзя переименовывать!
