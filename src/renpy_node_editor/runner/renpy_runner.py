@@ -126,14 +126,12 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
             existing_labels.add(new_label)  # Добавляем в множество, чтобы избежать конфликтов между сценами
     
     # Генерируем и сохраняем script.rpy
-    # Если файл уже существует, создаем новый с уникальным именем
+    # Заменяем существующий script.rpy на сгенерированный код
     script_path = game_dir / "script.rpy"
-    if script_path.exists() and is_existing:
-        # Для существующего проекта создаем файл с именем проекта
-        safe_name = project.name.replace(" ", "_").replace("-", "_")
-        script_path = game_dir / f"{safe_name}_script.rpy"
     
     code = generate_renpy_script(modified_project)
+    
+    # Записываем код в script.rpy (заменяем существующий файл, если он есть)
     with script_path.open("w", encoding="utf-8") as f:
         f.write(code)
     

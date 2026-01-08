@@ -388,19 +388,36 @@ class MainWindow(QMainWindow):
         is_existing = is_renpy_project(project_path)
         
         if is_existing:
-            # Для существующего проекта предупреждаем о добавлении файла
-            reply = QMessageBox.question(
-                self,
-                "Экспорт в существующий проект",
-                f"Выбран существующий проект Ren'Py:\n{project_dir}\n\n"
-                f"Сгенерированный код будет добавлен в папку game/.\n"
-                f"Существующие файлы не будут изменены.\n\n"
-                f"Продолжить?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
-            )
-            if reply == QMessageBox.No:
-                return
+            # Проверяем, существует ли script.rpy
+            script_path = project_path / "game" / "script.rpy"
+            if script_path.exists():
+                # Для существующего проекта предупреждаем о замене script.rpy
+                reply = QMessageBox.question(
+                    self,
+                    "Экспорт в существующий проект",
+                    f"Выбран существующий проект Ren'Py:\n{project_dir}\n\n"
+                    f"⚠️ ВНИМАНИЕ: Файл script.rpy будет заменен!\n"
+                    f"Текущее содержимое script.rpy будет потеряно.\n"
+                    f"Другие файлы (options.rpy, gui.rpy и т.д.) не будут изменены.\n\n"
+                    f"Продолжить?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+            else:
+                # Если script.rpy нет, просто предупреждаем
+                reply = QMessageBox.question(
+                    self,
+                    "Экспорт в существующий проект",
+                    f"Выбран существующий проект Ren'Py:\n{project_dir}\n\n"
+                    f"Сгенерированный код будет сохранен в game/script.rpy.\n\n"
+                    f"Продолжить?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                if reply == QMessageBox.No:
+                    return
         elif project_path.exists() and any(project_path.iterdir()):
             # Для новой папки предупреждаем, если она не пуста
             reply = QMessageBox.question(
@@ -419,9 +436,10 @@ class MainWindow(QMainWindow):
             created_path = self._controller.export_to_renpy_project(project_path)
             
             if is_existing:
+                script_path = created_path / "game" / "script.rpy"
                 message = (
-                    f"Код успешно добавлен в существующий проект Ren'Py:\n{created_path}\n\n"
-                    f"Файл создан в: {created_path / 'game'}"
+                    f"Код успешно экспортирован в проект Ren'Py:\n{created_path}\n\n"
+                    f"Файл script.rpy обновлен:\n{script_path}"
                 )
             else:
                 message = (
