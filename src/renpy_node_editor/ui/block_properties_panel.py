@@ -267,7 +267,9 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.LABEL:
             self._add_text_field("label", "Имя метки:", "")
         elif block_type == BlockType.SCENE:
-            self._add_combo_field("background", "Фон:", RENPY_BACKGROUNDS, "black")
+            # Фон может быть "black", "white" или имя изображения (например, "bg room")
+            # Добавляем поле с кнопкой выбора файла
+            self._add_background_field("background", "Фон:", "black")
             self._add_combo_field("layer", "Слой (опционально):", RENPY_LAYERS, "")
             self._add_combo_field("transition", "Переход (опционально):", RENPY_TRANSITIONS, "")
         elif block_type == BlockType.SHOW:
@@ -307,6 +309,111 @@ class BlockPropertiesPanel(QWidget):
         input_widget.setToolTip(tooltip)
         self._param_widgets[key] = input_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, input_widget)
+
+    def _add_background_field(self, key: str, label: str, default: str = "") -> None:
+        """Add a background field with combo box and file browse button"""
+        label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
+        
+        # Контейнер для комбобокса и кнопки
+        bg_container = QHBoxLayout()
+        bg_container.setSpacing(4)
+        
+        # Комбобокс с предопределенными значениями и возможностью ввода
+        combo = QComboBox(self)
+        combo.setEditable(True)
+        combo.addItem("")  # Пустой вариант
+        combo.addItems(RENPY_BACKGROUNDS)
+        
+        value = self.current_block.params.get(key, default) if self.current_block else default
+        current_text = str(value) if value else ""
+        
+        index = combo.findText(current_text)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        else:
+            combo.setCurrentText(current_text)
+        
+        combo.setToolTip(tooltip)
+        combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2A2A2A;
+                border: 1px solid #3A3A3A;
+                border-radius: 4px;
+                color: #E0E0E0;
+                padding: 4px;
+                min-height: 20px;
+            }
+            QComboBox:hover {
+                border-color: #4A90E2;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #E0E0E0;
+                width: 0;
+                height: 0;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2A2A2A;
+                border: 1px solid #3A3A3A;
+                border-radius: 4px;
+                color: #E0E0E0;
+                selection-background-color: #4A90E2;
+                selection-color: #FFFFFF;
+            }
+        """)
+        
+        self._param_widgets[key] = combo
+        bg_container.addWidget(combo, 1)
+        
+        # Кнопка выбора файла
+        browse_btn = QPushButton("📁", self)
+        browse_btn.setToolTip("Выбрать файл изображения")
+        browse_btn.setMaximumWidth(40)
+        browse_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4A90E2;
+                font-size: 12px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: #5BA0F2;
+            }
+            QPushButton:pressed {
+                background-color: #3A80D2;
+            }
+        """)
+        
+        def on_browse_clicked():
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                f"Выбрать изображение для {label}",
+                "",
+                "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)"
+            )
+            if file_path:
+                # Используем имя файла без расширения как имя изображения
+                # Пользователь может изменить это вручную
+                from pathlib import Path
+                filename = Path(file_path).stem
+                # Предлагаем имя в формате "bg filename"
+                suggested_name = f"bg {filename}" if not filename.startswith("bg ") else filename
+                combo.setCurrentText(suggested_name)
+        
+        browse_btn.clicked.connect(on_browse_clicked)
+        bg_container.addWidget(browse_btn)
+        
+        bg_widget = QWidget(self)
+        bg_widget.setLayout(bg_container)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, bg_widget)
 
     def _add_file_field(self, key: str, label: str, default: str = "", file_type: str = "all") -> None:
         """Add a file path input field with a browse button."""
