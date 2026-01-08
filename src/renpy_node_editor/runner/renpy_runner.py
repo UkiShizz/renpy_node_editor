@@ -26,31 +26,57 @@ def write_project_files(project: Project, project_dir: Path) -> Path:
     return script_path
 
 
-def create_renpy_project(project: Project, project_dir: Path) -> Path:
+def is_renpy_project(project_dir: Path) -> bool:
     """
-    Создает полноценный проект Ren'Py со всей необходимой структурой.
+    Проверяет, является ли директория проектом Ren'Py.
+    
+    Args:
+        project_dir: Путь к директории для проверки
+        
+    Returns:
+        True если это проект Ren'Py (есть папка game/)
+    """
+    return (project_dir / "game").is_dir()
+
+
+def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
+    """
+    Экспортирует проект в существующий или новый проект Ren'Py.
+    Если проект уже существует - добавляет сгенерированный код.
+    Если проекта нет - создает новый.
     
     Args:
         project: Проект редактора
-        project_dir: Директория для создания проекта Ren'Py
+        project_dir: Директория проекта Ren'Py (корень проекта)
         
     Returns:
         Путь к директории проекта
     """
-    # Создаем структуру папок
+    # Проверяем, существует ли уже проект Ren'Py
+    is_existing = is_renpy_project(project_dir)
+    
+    # Создаем или используем существующую папку game/
     game_dir = project_dir / "game"
     game_dir.mkdir(parents=True, exist_ok=True)
     
     # Генерируем и сохраняем script.rpy
+    # Если файл уже существует, создаем новый с уникальным именем
     script_path = game_dir / "script.rpy"
+    if script_path.exists() and is_existing:
+        # Для существующего проекта создаем файл с именем проекта
+        safe_name = project.name.replace(" ", "_").replace("-", "_")
+        script_path = game_dir / f"{safe_name}_script.rpy"
+    
     code = generate_renpy_script(project)
     with script_path.open("w", encoding="utf-8") as f:
         f.write(code)
     
-    # Создаем options.rpy с базовыми настройками
-    options_path = game_dir / "options.rpy"
-    if not options_path.exists():
-        options_content = f'''## Имя проекта
+    # Создаем базовые файлы только для нового проекта
+    if not is_existing:
+        # Создаем options.rpy с базовыми настройками
+        options_path = game_dir / "options.rpy"
+        if not options_path.exists():
+            options_content = f'''## Имя проекта
 define config.name = _("{project.name}")
 
 ## Версия проекта
@@ -76,13 +102,13 @@ define config.has_voice = True
 ## Пропуск текста
 define config.skip_delay = 0
 '''
-        with options_path.open("w", encoding="utf-8") as f:
-            f.write(options_content)
-    
-    # Создаем gui.rpy с базовыми настройками GUI (если не существует)
-    gui_path = game_dir / "gui.rpy"
-    if not gui_path.exists():
-        gui_content = '''## GUI настройки
+            with options_path.open("w", encoding="utf-8") as f:
+                f.write(options_content)
+        
+        # Создаем gui.rpy с базовыми настройками GUI (если не существует)
+        gui_path = game_dir / "gui.rpy"
+        if not gui_path.exists():
+            gui_content = '''## GUI настройки
 ## Эти настройки управляют внешним видом интерфейса игры.
 
 ## Цвета
@@ -103,8 +129,8 @@ define gui.label_text_size = 36
 define gui.textbox_height = 185
 define gui.textbox_yalign = 1.0
 '''
-        with gui_path.open("w", encoding="utf-8") as f:
-            f.write(gui_content)
+            with gui_path.open("w", encoding="utf-8") as f:
+                f.write(gui_content)
     
     return project_dir
 

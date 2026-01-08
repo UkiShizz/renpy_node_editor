@@ -361,17 +361,19 @@ class MainWindow(QMainWindow):
             )
             return
         
-        # Предлагаем сохранить в папку рядом с текущим проектом
-        default_path = None
-        if self._controller.project_path:
-            default_path = self._controller.project_path.parent / f"{self._controller.get_project_name()}_renpy"
-        else:
-            default_path = Path.home() / f"{self._controller.get_project_name()}_renpy"
+        # Предлагаем путь к существующему проекту Ren'Py по умолчанию
+        default_path = Path("C:\\Users\\ukish\\Desktop\\Новая папка")
+        if not default_path.exists():
+            # Если стандартный путь не существует, предлагаем рядом с текущим проектом
+            if self._controller.project_path:
+                default_path = self._controller.project_path.parent / f"{self._controller.get_project_name()}_renpy"
+            else:
+                default_path = Path.home() / f"{self._controller.get_project_name()}_renpy"
         
         # Диалог выбора папки
         project_dir = QFileDialog.getExistingDirectory(
             self,
-            "Экспорт в проект Ren'Py - выберите папку",
+            "Экспорт в проект Ren'Py - выберите папку проекта",
             str(default_path),
             QFileDialog.Option.ShowDirsOnly
         )
@@ -381,13 +383,31 @@ class MainWindow(QMainWindow):
         
         project_path = Path(project_dir)
         
-        # Проверяем, не пуста ли папка (предупреждаем пользователя)
-        if project_path.exists() and any(project_path.iterdir()):
+        # Проверяем, является ли это существующим проектом Ren'Py
+        from renpy_node_editor.runner.renpy_runner import is_renpy_project
+        is_existing = is_renpy_project(project_path)
+        
+        if is_existing:
+            # Для существующего проекта предупреждаем о добавлении файла
+            reply = QMessageBox.question(
+                self,
+                "Экспорт в существующий проект",
+                f"Выбран существующий проект Ren'Py:\n{project_dir}\n\n"
+                f"Сгенерированный код будет добавлен в папку game/.\n"
+                f"Существующие файлы не будут изменены.\n\n"
+                f"Продолжить?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.No:
+                return
+        elif project_path.exists() and any(project_path.iterdir()):
+            # Для новой папки предупреждаем, если она не пуста
             reply = QMessageBox.question(
                 self,
                 "Папка не пуста",
                 f"Папка '{project_dir}' не пуста.\n"
-                "Файлы могут быть перезаписаны.\n\n"
+                "Будет создан новый проект Ren'Py.\n\n"
                 "Продолжить?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
@@ -397,16 +417,27 @@ class MainWindow(QMainWindow):
         
         try:
             created_path = self._controller.export_to_renpy_project(project_path)
+            
+            if is_existing:
+                message = (
+                    f"Код успешно добавлен в существующий проект Ren'Py:\n{created_path}\n\n"
+                    f"Файл создан в: {created_path / 'game'}"
+                )
+            else:
+                message = (
+                    f"Проект Ren'Py успешно создан в:\n{created_path}\n\n"
+                    f"Структура:\n"
+                    f"  {created_path}/\n"
+                    f"    game/\n"
+                    f"      script.rpy\n"
+                    f"      options.rpy\n"
+                    f"      gui.rpy"
+                )
+            
             QMessageBox.information(
                 self,
                 "Экспорт завершен",
-                f"Проект Ren'Py успешно создан в:\n{created_path}\n\n"
-                f"Структура:\n"
-                f"  {created_path}/\n"
-                f"    game/\n"
-                f"      script.rpy\n"
-                f"      options.rpy\n"
-                f"      gui.rpy",
+                message,
             )
         except Exception as e:
             QMessageBox.critical(

@@ -105,20 +105,20 @@ class EditorController:
     
     def export_to_renpy_project(self, project_dir: Path) -> Path:
         """
-        Экспортировать проект в полноценный проект Ren'Py.
+        Экспортировать проект в существующий или новый проект Ren'Py.
         
         Args:
-            project_dir: Путь к директории для создания проекта Ren'Py
+            project_dir: Путь к директории проекта Ren'Py (корень проекта)
             
         Returns:
-            Путь к созданной директории проекта
+            Путь к директории проекта
         """
         if not self._state.current_project:
             raise ValueError("Нет открытого проекта")
         
-        from renpy_node_editor.runner.renpy_runner import create_renpy_project
+        from renpy_node_editor.runner.renpy_runner import export_to_renpy_project as export_func
         
-        return create_renpy_project(self._state.current_project, project_dir)
+        return export_func(self._state.current_project, project_dir)
 
     # ---- удобняшки ----
 
