@@ -230,22 +230,23 @@ class MainWindow(QMainWindow):
         if not project.scenes:
             scene = Scene(id=str(uuid.uuid4()), name="Main Scene", label="start")
             project.add_scene(scene)
-            self._controller.save_current_project()
+            # Не сохраняем при создании - сохраним при первом сохранении пользователем
             return scene
         return project.scenes[0]
     
     def _create_default_project(self) -> None:
-        """Создать новый чистый проект при старте"""
-        import tempfile
+        """Создать новый чистый проект при старте (без сохранения)"""
+        # Создаем проект только в памяти, без сохранения
+        # При первом сохранении пользователь выберет папку
+        from renpy_node_editor.core.model import Project
         import uuid
         
-        # Создаем временную директорию для проекта
-        temp_dir = Path(tempfile.gettempdir()) / f"renpy_editor_{uuid.uuid4().hex[:8]}"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Создаем новый проект
-        project = self._controller.new_project("New Project", temp_dir)
+        project = Project(name="New Project")
         scene = self._create_default_scene_if_needed(project)
+        
+        # Устанавливаем проект в контроллере, но БЕЗ пути (будет запрошен при сохранении)
+        self._controller._state.current_project = project
+        self._controller._state.current_project_path = None
         
         # Загружаем проект в UI
         self._load_project(project, scene)
@@ -276,23 +277,24 @@ class MainWindow(QMainWindow):
     # ---- слоты верхних кнопок ----
 
     def _on_new_project(self) -> None:
-        base_dir = QFileDialog.getExistingDirectory(
-            self,
-            "Выбери папку для проекта",
-        )
-        if not base_dir:
-            return
-
         from PySide6.QtWidgets import QInputDialog
 
         name, ok = QInputDialog.getText(self, "Имя проекта", "Имя проекта:")
         if not ok or not name:
             return
 
-        project_dir = Path(base_dir) / name
-        project = self._controller.new_project(name, project_dir)
+        # Создаем проект только в памяти, без сохранения
+        # Папка будет запрошена при первом сохранении
+        from renpy_node_editor.core.model import Project
+        import uuid
+        
+        project = Project(name=name)
         scene = self._create_default_scene_if_needed(project)
-
+        
+        # Устанавливаем проект в контроллере, но БЕЗ пути (будет запрошен при сохранении)
+        self._controller._state.current_project = project
+        self._controller._state.current_project_path = None
+        
         self._load_project(project, scene)
 
     def _on_open_project(self) -> None:
@@ -348,15 +350,27 @@ class MainWindow(QMainWindow):
             if not base_dir:
                 return
             
-            project_dir = Path(base_dir)
+            # Спрашиваем имя проекта, если нужно
+            project_name = self._controller.project.name if self._controller.project else "New Project"
+            project_dir = Path(base_dir) / project_name
+            
+            # Если папка уже существует, спрашиваем подтверждение
+            if project_dir.exists():
+                from PySide6.QtWidgets import QMessageBox
+                reply = QMessageBox.question(
+                    self,
+                    "Папка существует",
+                    f"Папка {project_dir} уже существует. Перезаписать?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+            
             # Сохраняем проект в выбранную папку
             from renpy_node_editor.core.serialization import save_project
             save_project(self._controller.project, project_dir)
-            # Обновляем путь в контроллере через метод open_project (он устанавливает путь)
-            # Или создаем новый проект с тем же именем в новой папке
-            # Проще всего - просто сохранить и обновить путь напрямую
-            # Но нужно проверить, есть ли публичный метод для установки пути
-            # Пока используем прямое обращение к _state (не идеально, но работает)
+            # Обновляем путь в контроллере
             if hasattr(self._controller, '_state'):
                 self._controller._state.current_project_path = project_dir
             self._update_window_title()
