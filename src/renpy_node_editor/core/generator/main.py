@@ -360,22 +360,10 @@ def generate_renpy_script(project: Project) -> str:
         char_name_map[name] = normalized_name
     
     # Generate scenes
-    has_start_label = any(scene.label == "start" for scene in project.scenes)
-    
     for scene in project.scenes:
         lines.append(generate_scene(scene, char_name_map))
     
-    # Если нет метки start, создаем её как точку входа
-    if not has_start_label and project.scenes:
-        # Используем первую сцену как точку входа
-        lines.append("\n# Main entry point\n")
-        lines.append("label start:\n")
-        first_scene = project.scenes[0]
-        lines.append(f"    jump {first_scene.label}\n")
-    elif not has_start_label:
-        # Если вообще нет сцен, создаем пустую метку start
-        lines.append("\n# Main entry point\n")
-        lines.append("label start:\n")
-        lines.append("    return\n")
+    # Не создаем автоматическую метку start - пользователь должен сам создать сцену с меткой start
+    # Если нет метки start, Ren'Py выдаст ошибку, но это нормально - пользователь должен явно указать точку входа
     
     return "".join(lines)
