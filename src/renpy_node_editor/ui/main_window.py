@@ -115,8 +115,8 @@ class MainWindow(QMainWindow):
         btn_save.setToolTip("Сохранить текущий проект")
         btn_generate = QPushButton("⚙️ Сгенерировать код", self)
         btn_generate.setToolTip("Сгенерировать Ren'Py код и показать в панели предпросмотра")
-        btn_export = QPushButton("📤 Экспорт в .rpy", self)
-        btn_export.setToolTip("Экспортировать сгенерированный код в .rpy файл")
+        btn_export = QPushButton("📤 Экспорт в Ren'Py", self)
+        btn_export.setToolTip("Экспортировать проект в готовый проект Ren'Py (папку)")
         btn_run = QPushButton("▶️ Запустить в Ren'Py", self)
         btn_run.setToolTip("Запустить проект в Ren'Py SDK")
         btn_center = QPushButton("🎯 Центр", self)
@@ -352,7 +352,7 @@ class MainWindow(QMainWindow):
         self.preview_panel.set_code(code)
     
     def _on_export_rpy(self) -> None:
-        """Экспортировать сгенерированный код в .rpy файл"""
+        """Экспортировать проект в готовый проект Ren'Py"""
         if not self._controller.project:
             QMessageBox.warning(
                 self,
@@ -361,35 +361,58 @@ class MainWindow(QMainWindow):
             )
             return
         
-        # Предлагаем сохранить в папку проекта по умолчанию
-        default_name = f"{self._controller.get_project_name()}_script.rpy"
+        # Предлагаем сохранить в папку рядом с текущим проектом
         default_path = None
         if self._controller.project_path:
-            default_path = self._controller.project_path / default_name
+            default_path = self._controller.project_path.parent / f"{self._controller.get_project_name()}_renpy"
+        else:
+            default_path = Path.home() / f"{self._controller.get_project_name()}_renpy"
         
-        # Диалог выбора файла
-        file_path, _ = QFileDialog.getSaveFileName(
+        # Диалог выбора папки
+        project_dir = QFileDialog.getExistingDirectory(
             self,
-            "Экспорт в .rpy файл",
-            str(default_path) if default_path else default_name,
-            "Ren'Py Script Files (*.rpy);;All Files (*.*)"
+            "Экспорт в проект Ren'Py - выберите папку",
+            str(default_path),
+            QFileDialog.Option.ShowDirsOnly
         )
         
-        if not file_path:
+        if not project_dir:
             return
         
+        project_path = Path(project_dir)
+        
+        # Проверяем, не пуста ли папка (предупреждаем пользователя)
+        if project_path.exists() and any(project_path.iterdir()):
+            reply = QMessageBox.question(
+                self,
+                "Папка не пуста",
+                f"Папка '{project_dir}' не пуста.\n"
+                "Файлы могут быть перезаписаны.\n\n"
+                "Продолжить?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+        
         try:
-            self._controller.export_to_rpy(Path(file_path))
+            created_path = self._controller.export_to_renpy_project(project_path)
             QMessageBox.information(
                 self,
                 "Экспорт завершен",
-                f"Код успешно экспортирован в:\n{file_path}",
+                f"Проект Ren'Py успешно создан в:\n{created_path}\n\n"
+                f"Структура:\n"
+                f"  {created_path}/\n"
+                f"    game/\n"
+                f"      script.rpy\n"
+                f"      options.rpy\n"
+                f"      gui.rpy",
             )
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Ошибка экспорта",
-                f"Не удалось экспортировать файл:\n{str(e)}",
+                f"Не удалось экспортировать проект:\n{str(e)}",
             )
 
     def _on_run_project(self) -> None:

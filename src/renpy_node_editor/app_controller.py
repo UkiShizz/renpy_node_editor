@@ -103,24 +103,22 @@ class EditorController:
 
         return generate_renpy_script(self._state.current_project)
     
-    def export_to_rpy(self, file_path: Path) -> None:
+    def export_to_renpy_project(self, project_dir: Path) -> Path:
         """
-        Экспортировать сгенерированный код в .rpy файл.
+        Экспортировать проект в полноценный проект Ren'Py.
         
         Args:
-            file_path: Путь к файлу для сохранения
+            project_dir: Путь к директории для создания проекта Ren'Py
+            
+        Returns:
+            Путь к созданной директории проекта
         """
         if not self._state.current_project:
             raise ValueError("Нет открытого проекта")
         
-        code = generate_renpy_script(self._state.current_project)
+        from renpy_node_editor.runner.renpy_runner import create_renpy_project
         
-        # Создаем директорию если нужно
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Сохраняем файл
-        with file_path.open("w", encoding="utf-8") as f:
-            f.write(code)
+        return create_renpy_project(self._state.current_project, project_dir)
 
     # ---- удобняшки ----
 
