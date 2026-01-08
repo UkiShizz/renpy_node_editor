@@ -219,9 +219,11 @@ class MainWindow(QMainWindow):
                 if scene:
                     # Отключаем ВСЕ старые соединения если есть
                     try:
-                        # Отключаем все слоты от сигнала
-                        scene.node_selection_changed.disconnect()
-                    except Exception:
+                        # Отключаем все слоты от сигнала, но только если есть подключения
+                        if scene.receivers(scene.node_selection_changed) > 0:
+                            scene.node_selection_changed.disconnect()
+                    except (TypeError, RuntimeError):
+                        # Игнорируем ошибки отключения (сигнал может быть не подключен)
                         pass
                     
                     # Подключаем новые
