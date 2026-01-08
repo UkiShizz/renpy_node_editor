@@ -47,6 +47,9 @@ class NodeScene(QGraphicsScene):
         self._drag_connection: Optional[ConnectionItem] = None
         self._drag_src_port: Optional[PortItem] = None
         
+        # Флаг для предотвращения одновременных вызовов set_project_and_scene
+        self._is_loading = False
+        
         # Connect selection changed signal
         self.selectionChanged.connect(self._on_selection_changed)
 
@@ -54,78 +57,101 @@ class NodeScene(QGraphicsScene):
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
+        # Защита от одновременных вызовов
+        if self._is_loading:
+            print("Warning: set_project_and_scene called while already loading, skipping")
+            return
+        
+        self._is_loading = True
         try:
-            # Блокируем сигналы во время очистки - НЕ отключаем selectionChanged
+            print(f"DEBUG: set_project_and_scene called for scene {scene.id}")
+            
+            # Блокируем сигналы во время очистки
             self.blockSignals(True)
             
             # Очищаем выделение перед очисткой элементов
             try:
                 self.clearSelection()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"DEBUG: error clearing selection: {e}")
             
             # Очищаем состояние перетаскивания
             if self._drag_connection:
                 try:
                     if self._drag_connection.scene() == self:
                         self.removeItem(self._drag_connection)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"DEBUG: error removing drag_connection: {e}")
                 self._drag_connection = None
             self._drag_src_port = None
             
-            # Безопасно очищаем все элементы - используем clear() вместо ручного удаления
+            # Безопасно очищаем все элементы
             try:
-                # Сначала разрываем все соединения в модели, чтобы избежать проблем
+                print(f"DEBUG: clearing {len(self.items())} items")
+                # Сначала разрываем все соединения в модели
                 if self._scene_model:
                     for block in list(self._scene_model.blocks):
                         for port in list(block.inputs) + list(block.outputs):
                             for conn in list(port.connections):
                                 try:
                                     self._scene_model.remove_connection(conn.id)
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    print(f"DEBUG: error removing connection {conn.id}: {e}")
                 
-                # Используем clear() - это самый безопасный способ
-                self.clear()
-            except Exception as e:
-                print(f"Warning: error clearing scene: {e}")
-                import traceback
-                print(traceback.format_exc())
-                # Fallback - пытаемся очистить вручную
-                try:
-                    items = list(self.items())
-                    for item in items:
+                # Удаляем элементы в правильном порядке
+                items = list(self.items())
+                # Сначала удаляем ConnectionItem
+                for item in items:
+                    if isinstance(item, ConnectionItem):
                         try:
                             if item.scene() == self:
                                 self.removeItem(item)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                        except Exception as e:
+                            print(f"DEBUG: error removing ConnectionItem: {e}")
+                
+                # Затем удаляем NodeItem (порты удалятся автоматически)
+                for item in items:
+                    if isinstance(item, NodeItem):
+                        try:
+                            if item.scene() == self:
+                                self.removeItem(item)
+                        except Exception as e:
+                            print(f"DEBUG: error removing NodeItem: {e}")
+                
+                print(f"DEBUG: cleared, remaining items: {len(self.items())}")
+            except Exception as e:
+                print(f"ERROR: error clearing scene: {e}")
+                import traceback
+                print(traceback.format_exc())
             
             # Устанавливаем новую модель
             self._project = project
             self._scene_model = scene
             
+            print(f"DEBUG: creating {len(scene.blocks)} blocks")
             # Создаем блоки
             for block in scene.blocks:
                 try:
                     self._create_node_item_for_block(block)
                 except Exception as e:
-                    print(f"Error creating block {block.id}: {e}")
+                    print(f"ERROR: error creating block {block.id}: {e}")
+                    import traceback
+                    print(traceback.format_exc())
                     continue
             
             # Создаем связи
             try:
+                print(f"DEBUG: creating connections")
                 self._create_connections()
             except Exception as e:
-                print(f"Error creating connections: {e}")
+                print(f"ERROR: error creating connections: {e}")
                 import traceback
                 print(traceback.format_exc())
+            
+            print(f"DEBUG: set_project_and_scene completed successfully")
         except Exception as e:
             import traceback
-            print(f"Error in set_project_and_scene: {e}")
+            print(f"ERROR: exception in set_project_and_scene: {e}")
             print(traceback.format_exc())
             # Устанавливаем модель даже при ошибке
             try:
@@ -137,8 +163,9 @@ class NodeScene(QGraphicsScene):
             # Разблокируем сигналы
             try:
                 self.blockSignals(False)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"DEBUG: error unblocking signals: {e}")
+            self._is_loading = False
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
         item = NodeItem(block)
