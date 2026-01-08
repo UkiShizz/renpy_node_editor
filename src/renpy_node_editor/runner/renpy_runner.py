@@ -144,28 +144,20 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         
         # Это абсолютный путь - ищем "/game/" в пути (регистронезависимо)
         old_path_lower = old_path_str.lower()
-        game_marker = "/game/"
         
-        if game_marker in old_path_lower:
-            # Находим позицию "/game/" в нижнем регистре
-            game_pos_lower = old_path_lower.find(game_marker)
-            if game_pos_lower != -1:
-                # Берем часть после "/game/" из оригинального пути (с учетом регистра)
-                relative_part = old_path_str[game_pos_lower + len(game_marker):]
-                # Убираем ведущие слеши, если есть
-                relative_part = relative_part.lstrip("/")
-                if relative_part:  # Если что-то осталось
-                    return relative_part
-        
-        # Также проверяем вариант с обратными слешами
-        if "\\game\\" in old_path_lower or "\\game/" in old_path_lower or "/game\\" in old_path_lower:
-            # Ищем любой вариант "/game/" или "\game\"
-            for marker in ["/game/", "\\game\\", "\\game/", "/game\\"]:
-                pos = old_path_lower.find(marker.lower())
-                if pos != -1:
-                    relative_part = old_path_str[pos + len(marker):]
+        # Ищем любой вариант "/game/" или "\game\"
+        markers = ["/game/", "\\game\\", "\\game/", "/game\\"]
+        for marker in markers:
+            marker_lower = marker.lower()
+            if marker_lower in old_path_lower:
+                # Находим позицию маркера в нижнем регистре
+                pos_lower = old_path_lower.find(marker_lower)
+                if pos_lower != -1:
+                    # Берем часть после маркера из оригинального пути
+                    relative_part = old_path_str[pos_lower + len(marker):]
+                    # Убираем ведущие слеши, если есть
                     relative_part = relative_part.lstrip("/\\")
-                    if relative_part:
+                    if relative_part:  # Если что-то осталось
                         return relative_part.replace("\\", "/")
         
         # Если не нашли "/game/", пытаемся через Path
