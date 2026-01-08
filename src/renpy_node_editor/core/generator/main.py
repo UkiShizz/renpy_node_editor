@@ -216,6 +216,56 @@ def generate_block_chain(
     return "".join(lines)
 
 
+def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None) -> str:
+    """Generate code for a scene"""
+    lines: List[str] = []
+    
+    lines.append(generate_label(scene))
+    
+    if not scene.blocks:
+        lines.append(f"{INDENT}pass\n\n")
+        return "".join(lines)
+    
+    connections_map = get_block_connections(scene)
+    start_blocks = find_start_blocks(scene, connections_map)
+    
+    if not start_blocks:
+        indent = INDENT
+        for block in sorted(scene.blocks, key=lambda b: (b.y, b.x)):
+            code = generate_block(block, indent, char_name_map)
+            if code:
+                lines.append(code)
+    else:
+        visited: Set[str] = set()
+        for start_block in start_blocks:
+            code = generate_block_chain(
+                scene, start_block.id, connections_map, visited.copy(), INDENT, char_name_map
+            )
+            if code:
+                lines.append(code)
+        
+        # Add unprocessed blocks
+        processed = set()
+        for start_block in start_blocks:
+            processed.add(start_block.id)
+            stack = [start_block.id]
+            while stack:
+                current_id = stack.pop()
+                # Extract block IDs from (block_id, distance) tuples
+                next_blocks_with_dist = connections_map.get(current_id, [])
+                for next_id, _ in next_blocks_with_dist:
+                    if next_id not in processed:
+                        processed.add(next_id)
+                        stack.append(next_id)
+        
+        for block in scene.blocks:
+            if block.id not in processed:
+                code = generate_block(block, INDENT, char_name_map)
+                if code:
+                    lines.append(code)
+    
+    lines.append("\n")
+    return "".join(lines)
 
 
 def extract_characters(project: Project) -> Set[str]:
