@@ -214,22 +214,25 @@ class MainWindow(QMainWindow):
     def _connect_scene_signals(self) -> None:
         """Подключить сигналы сцены к панели свойств"""
         try:
-            if hasattr(self, 'node_view') and self.node_view and hasattr(self.node_view, 'node_scene'):
-                scene = self.node_view.node_scene
-                if scene:
-                    # Отключаем ВСЕ старые соединения если есть
-                    try:
-                        # Отключаем все слоты от сигнала, но только если есть подключения
-                        if scene.receivers(scene.node_selection_changed) > 0:
-                            scene.node_selection_changed.disconnect()
-                    except (TypeError, RuntimeError):
-                        # Игнорируем ошибки отключения (сигнал может быть не подключен)
-                        pass
-                    
-                    # Подключаем новые
-                    scene.node_selection_changed.connect(
-                        self.properties_panel.set_block
-                    )
+            if not hasattr(self, 'node_view') or not self.node_view:
+                return
+            if not hasattr(self.node_view, 'node_scene'):
+                return
+            scene = self.node_view.node_scene
+            if not scene:
+                return
+            # Отключаем ВСЕ старые соединения если есть
+            try:
+                # Отключаем все слоты от сигнала, но только если есть подключения
+                if scene.receivers(scene.node_selection_changed) > 0:
+                    scene.node_selection_changed.disconnect()
+            except (TypeError, RuntimeError):
+                # Игнорируем ошибки отключения (сигнал может быть не подключен)
+                pass
+            # Подключаем новые
+            scene.node_selection_changed.connect(
+                self.properties_panel.set_block
+            )
         except Exception as e:
             print(f"Warning: error connecting scene signals: {e}")
             import traceback
