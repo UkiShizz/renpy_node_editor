@@ -331,8 +331,49 @@ class MainWindow(QMainWindow):
         self._update_window_title()
 
     def _on_save_project(self) -> None:
-        self._controller.save_current_project()
-        QMessageBox.information(self, "Сохранено", "Проект сохранён.")
+        if not self._controller.project:
+            QMessageBox.warning(
+                self,
+                "Нет проекта",
+                "Сначала создай или открой проект.",
+            )
+            return
+        
+        # Если проект еще не был сохранен, предлагаем выбрать папку
+        if not self._controller.project_path:
+            base_dir = QFileDialog.getExistingDirectory(
+                self,
+                "Выбери папку для сохранения проекта",
+            )
+            if not base_dir:
+                return
+            
+            project_dir = Path(base_dir)
+            # Сохраняем проект в выбранную папку
+            from renpy_node_editor.core.serialization import save_project
+            save_project(self._controller.project, project_dir)
+            # Обновляем путь в контроллере через метод open_project (он устанавливает путь)
+            # Или создаем новый проект с тем же именем в новой папке
+            # Проще всего - просто сохранить и обновить путь напрямую
+            # Но нужно проверить, есть ли публичный метод для установки пути
+            # Пока используем прямое обращение к _state (не идеально, но работает)
+            if hasattr(self._controller, '_state'):
+                self._controller._state.current_project_path = project_dir
+            self._update_window_title()
+        else:
+            # Проект уже имеет путь - сохраняем туда
+            self._controller.save_current_project()
+        
+        # Показываем сообщение с путем
+        project_path = self._controller.project_path
+        if project_path:
+            QMessageBox.information(
+                self,
+                "Сохранено",
+                f"Проект сохранён в:\n{project_path}\n\nФайл: {project_path / 'project.json'}",
+            )
+        else:
+            QMessageBox.information(self, "Сохранено", "Проект сохранён.")
 
     def _on_generate_code(self) -> None:
         code = self._controller.generate_script()
