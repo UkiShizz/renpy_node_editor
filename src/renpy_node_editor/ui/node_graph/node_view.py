@@ -50,23 +50,18 @@ class NodeView(QGraphicsView):
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену - используем существующую сцену и безопасно очищаем её"""
         try:
-            print(f"DEBUG: NodeView.set_project_and_scene called for scene {scene.id}")
-            
             # Сохраняем текущее состояние view
             try:
                 current_center = self.mapToScene(self.viewport().rect().center())
-            except Exception as e:
-                print(f"DEBUG: error getting current center: {e}")
+            except Exception:
                 current_center = None
             
             # Используем существующую сцену вместо пересоздания
             if not self._scene:
-                print("DEBUG: creating new NodeScene")
                 self._scene = NodeScene(self)
                 self.setScene(self._scene)
             
             # Безопасно очищаем и устанавливаем новую сцену
-            print(f"DEBUG: calling scene.set_project_and_scene")
             self._scene.set_project_and_scene(project, scene)
             
             # Восстанавливаем центр view
@@ -75,21 +70,15 @@ class NodeView(QGraphicsView):
                     self.centerOn(current_center)
                 else:
                     self.centerOn(0, 0)
-            except Exception as e:
-                print(f"DEBUG: error centering view: {e}")
+            except Exception:
                 self.centerOn(0, 0)
-            
-            print(f"DEBUG: NodeView.set_project_and_scene completed")
-        except Exception as e:
-            import traceback
-            print(f"ERROR: exception in NodeView.set_project_and_scene: {e}")
-            print(traceback.format_exc())
+        except Exception:
             # Fallback - пытаемся использовать существующую сцену
             try:
                 if self._scene:
                     self._scene.set_project_and_scene(project, scene)
-            except Exception as e2:
-                print(f"ERROR: fallback also failed: {e2}")
+            except Exception:
+                pass
     
     def center_view(self) -> None:
         """Вернуться в центр рабочей области"""

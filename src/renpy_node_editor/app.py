@@ -3,15 +3,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# --- КОСТЫЛЬ: добавить src/ в sys.path ДО импортов пакета --- #
+# Ensure package root is in sys.path for direct script execution
 _this_file = Path(__file__).resolve()
-_project_root = _this_file.parents[2]          # ...\renpy_node_editor
+_project_root = _this_file.parents[2]  # ...\renpy_node_editor
 _src_dir = _project_root / "src"
-if _src_dir.is_dir():
-    s = str(_src_dir)
-    if s not in sys.path:
-        sys.path.insert(0, s)
-# ------------------------------------------------------------ #
+if _src_dir.is_dir() and str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
 
 from PySide6.QtWidgets import QApplication
 

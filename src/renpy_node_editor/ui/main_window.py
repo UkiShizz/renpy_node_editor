@@ -191,11 +191,6 @@ class MainWindow(QMainWindow):
 
         self.main_splitter.addWidget(right_container)
         
-        # Connect node selection to properties panel (after both are created)
-        # Это будет переподключено при пересоздании сцены
-        # Отложенное подключение сигналов - после установки центрального виджета
-        # self._connect_scene_signals()  # Будет вызвано после setCentralWidget
-        
         # Connect properties saved signal to update node display
         self.properties_panel.properties_saved.connect(self._on_properties_saved)
         
@@ -218,29 +213,31 @@ class MainWindow(QMainWindow):
     def _connect_scene_signals(self) -> None:
         """Подключить сигналы сцены к панели свойств"""
         try:
-            if not hasattr(self, 'node_view') or not self.node_view:
-                return
-            if not hasattr(self.node_view, 'node_scene'):
-                return
             scene = self.node_view.node_scene
             if not scene:
                 return
             # Отключаем ВСЕ старые соединения если есть
             try:
-                # Отключаем все слоты от сигнала, но только если есть подключения
                 if scene.receivers(scene.node_selection_changed) > 0:
                     scene.node_selection_changed.disconnect()
             except (TypeError, RuntimeError):
-                # Игнорируем ошибки отключения (сигнал может быть не подключен)
                 pass
             # Подключаем новые
             scene.node_selection_changed.connect(
                 self.properties_panel.set_block
             )
-        except Exception as e:
-            print(f"Warning: error connecting scene signals: {e}")
-            import traceback
-            print(traceback.format_exc())
+        except Exception:
+            pass
+    
+    def _create_default_scene_if_needed(self, project: Project) -> Scene:
+        """Создать базовую сцену, если в проекте нет сцен"""
+        import uuid
+        if not project.scenes:
+            scene = Scene(id=str(uuid.uuid4()), name="Main Scene", label="start")
+            project.add_scene(scene)
+            self._controller.save_current_project()
+            return scene
+        return project.scenes[0]
     
     def _create_default_project(self) -> None:
         """Создать новый чистый проект при старте"""
@@ -253,15 +250,7 @@ class MainWindow(QMainWindow):
         
         # Создаем новый проект
         project = self._controller.new_project("New Project", temp_dir)
-        
-        # Если в шаблоне нет сцен — создаём базовую
-        if not project.scenes:
-            scene = Scene(id=str(uuid.uuid4()), name="Main Scene", label="start")
-            project.add_scene(scene)
-            # Сохраняем проект с новой сценой
-            self._controller.save_current_project()
-        else:
-            scene = project.scenes[0]
+        scene = self._create_default_scene_if_needed(project)
         
         # Загружаем проект в UI
         self._load_project(project, scene)
@@ -279,13 +268,10 @@ class MainWindow(QMainWindow):
             self.preview_panel.clear()
             self._update_window_title()
         except Exception as e:
-            import traceback
-            error_msg = f"Не удалось загрузить проект:\n{str(e)}\n\n{traceback.format_exc()}"
-            print(error_msg)  # Также выводим в консоль
             QMessageBox.critical(
                 self,
                 "Ошибка загрузки проекта",
-                error_msg
+                f"Не удалось загрузить проект:\n{str(e)}"
             )
 
     def _update_window_title(self) -> None:
@@ -310,15 +296,7 @@ class MainWindow(QMainWindow):
 
         project_dir = Path(base_dir) / name
         project = self._controller.new_project(name, project_dir)
-
-        # Если в шаблоне нет сцен — создаём базовую
-        if not project.scenes:
-            import uuid
-            scene = Scene(id=str(uuid.uuid4()), name="Main Scene", label="start")
-            project.add_scene(scene)
-            self._controller.save_current_project()
-        else:
-            scene = project.scenes[0]
+        scene = self._create_default_scene_if_needed(project)
 
         self._load_project(project, scene)
 
@@ -474,10 +452,8 @@ class MainWindow(QMainWindow):
                     if item.block.id == block.id:
                         item.update_display()
                         break
-        except Exception as e:
-            import traceback
-            print(f"Error in _on_properties_saved: {e}")
-            print(traceback.format_exc())
+        except Exception:
+            pass
     
     def _on_center_view(self) -> None:
         """Вернуться в центр рабочей области"""
@@ -489,31 +465,23 @@ class MainWindow(QMainWindow):
             return
         
         # Проверяем, что сцена существует в проекте
-        if scene not in self._controller.project.scenes:
-            # Если сцена не найдена, пытаемся найти её по ID
-            found_scene = self._controller.project.find_scene(scene.id)
-            if not found_scene:
-                return
-            scene = found_scene
+        found_scene = self._controller.project.find_scene(scene.id)
+        if not found_scene:
+            return
+        scene = found_scene
         
         # Проверяем, что это не та же сцена (избегаем лишних перезагрузок)
-        if (hasattr(self, 'node_view') and self.node_view and 
-            hasattr(self.node_view, 'node_scene') and self.node_view.node_scene and
-            hasattr(self.node_view.node_scene, '_scene_model') and 
-            self.node_view.node_scene._scene_model and
+        if (self.node_view.node_scene._scene_model and
             self.node_view.node_scene._scene_model.id == scene.id):
             return  # Уже загружена эта сцена
         
         try:
             self._load_project(self._controller.project, scene)
         except Exception as e:
-            import traceback
-            error_msg = f"Не удалось загрузить сцену '{scene.name}':\n{str(e)}\n\n{traceback.format_exc()}"
-            print(error_msg)  # Выводим в консоль для отладки
             QMessageBox.critical(
                 self,
                 "Ошибка загрузки сцены",
-                error_msg
+                f"Не удалось загрузить сцену '{scene.name}':\n{str(e)}"
             )
     
     def _load_splitter_sizes(self) -> None:

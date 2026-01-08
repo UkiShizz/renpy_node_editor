@@ -59,36 +59,31 @@ class NodeScene(QGraphicsScene):
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
         # Защита от одновременных вызовов
         if self._is_loading:
-            print("Warning: set_project_and_scene called while already loading, skipping")
             return
         
         self._is_loading = True
         try:
-            print(f"DEBUG: set_project_and_scene called for scene {scene.id}")
-            
             # Блокируем сигналы во время очистки
             self.blockSignals(True)
             
             # Очищаем выделение перед очисткой элементов
             try:
                 self.clearSelection()
-            except Exception as e:
-                print(f"DEBUG: error clearing selection: {e}")
+            except Exception:
+                pass
             
             # Очищаем состояние перетаскивания
             if self._drag_connection:
                 try:
                     if self._drag_connection.scene() == self:
                         self.removeItem(self._drag_connection)
-                except Exception as e:
-                    print(f"DEBUG: error removing drag_connection: {e}")
+                except Exception:
+                    pass
                 self._drag_connection = None
             self._drag_src_port = None
             
             # Безопасно очищаем все элементы
             try:
-                print(f"DEBUG: clearing {len(self.items())} items")
-                
                 # Сначала очищаем все соединения из портов, чтобы избежать проблем при удалении
                 items = list(self.items())
                 for item in items:
@@ -96,19 +91,7 @@ class NodeScene(QGraphicsScene):
                         # Отключаем обновление позиции для всех портов
                         for port in item.inputs + item.outputs:
                             if port and hasattr(port, 'connections'):
-                                # Очищаем список соединений, но не удаляем сами ConnectionItem
-                                # они будут удалены позже
                                 port.connections.clear()
-                
-                # Разрываем все соединения в модели
-                if self._scene_model:
-                    for block in list(self._scene_model.blocks):
-                        for port in list(block.inputs) + list(block.outputs):
-                            for conn in list(port.connections):
-                                try:
-                                    self._scene_model.remove_connection(conn.id)
-                                except Exception as e:
-                                    print(f"DEBUG: error removing connection {conn.id}: {e}")
                 
                 # Удаляем ConnectionItem (теперь порты не будут пытаться их обновить)
                 for item in items:
@@ -127,8 +110,8 @@ class NodeScene(QGraphicsScene):
                                     except Exception:
                                         pass
                                 self.removeItem(item)
-                        except Exception as e:
-                            print(f"DEBUG: error removing ConnectionItem: {e}")
+                        except Exception:
+                            pass
                 
                 # Затем удаляем NodeItem (порты удалятся автоматически)
                 for item in items:
@@ -136,44 +119,28 @@ class NodeScene(QGraphicsScene):
                         try:
                             if item.scene() == self:
                                 self.removeItem(item)
-                        except Exception as e:
-                            print(f"DEBUG: error removing NodeItem: {e}")
-                
-                print(f"DEBUG: cleared, remaining items: {len(self.items())}")
-            except Exception as e:
-                print(f"ERROR: error clearing scene: {e}")
-                import traceback
-                print(traceback.format_exc())
+                        except Exception:
+                            pass
+            except Exception:
+                pass
             
             # Устанавливаем новую модель
             self._project = project
             self._scene_model = scene
             
-            print(f"DEBUG: creating {len(scene.blocks)} blocks")
             # Создаем блоки
             for block in scene.blocks:
                 try:
                     self._create_node_item_for_block(block)
-                except Exception as e:
-                    print(f"ERROR: error creating block {block.id}: {e}")
-                    import traceback
-                    print(traceback.format_exc())
+                except Exception:
                     continue
             
             # Создаем связи
             try:
-                print(f"DEBUG: creating connections")
                 self._create_connections()
-            except Exception as e:
-                print(f"ERROR: error creating connections: {e}")
-                import traceback
-                print(traceback.format_exc())
-            
-            print(f"DEBUG: set_project_and_scene completed successfully")
-        except Exception as e:
-            import traceback
-            print(f"ERROR: exception in set_project_and_scene: {e}")
-            print(traceback.format_exc())
+            except Exception:
+                pass
+        except Exception:
             # Устанавливаем модель даже при ошибке
             try:
                 self._project = project
@@ -184,8 +151,8 @@ class NodeScene(QGraphicsScene):
             # Разблокируем сигналы
             try:
                 self.blockSignals(False)
-            except Exception as e:
-                print(f"DEBUG: error unblocking signals: {e}")
+            except Exception:
+                pass
             self._is_loading = False
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
@@ -230,8 +197,7 @@ class NodeScene(QGraphicsScene):
                         try:
                             port_id = self._get_or_create_port_id(item.block, port)
                             port_items[port_id] = port
-                        except Exception as e:
-                            print(f"Error creating port_id: {e}")
+                        except Exception:
                             continue
             
             # Создаем связи
@@ -253,13 +219,10 @@ class NodeScene(QGraphicsScene):
                         self.addItem(connection_item)
                         src_port_item.add_connection(connection_item)
                         dst_port_item.add_connection(connection_item)
-                    except Exception as e:
-                        print(f"Error creating connection: {e}")
+                    except Exception:
                         continue
-        except Exception as e:
-            import traceback
-            print(f"Error in _create_connections: {e}")
-            print(traceback.format_exc())
+        except Exception:
+            pass
     
     def _get_or_create_port_id(self, block: Block, port_item: PortItem) -> str:
         """Получить или создать port_id для порта"""
@@ -484,11 +447,8 @@ class NodeScene(QGraphicsScene):
                     self.node_selection_changed.emit(None)
             else:
                 self.node_selection_changed.emit(None)
-        except Exception as e:
+        except Exception:
             # В случае ошибки просто эмитим None
-            import traceback
-            print(f"Error in _on_selection_changed: {e}")
-            print(traceback.format_exc())
             try:
                 self.node_selection_changed.emit(None)
             except Exception:
