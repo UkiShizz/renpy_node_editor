@@ -48,7 +48,7 @@ class NodeView(QGraphicsView):
         return self._scene
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
-        """Установить проект и сцену - пересоздаем сцену для безопасности"""
+        """Установить проект и сцену - используем существующую сцену и безопасно очищаем её"""
         try:
             # Сохраняем текущее состояние view
             try:
@@ -56,68 +56,12 @@ class NodeView(QGraphicsView):
             except Exception:
                 current_center = None
             
-            # Полностью отключаем и очищаем старую сцену
-            old_scene = self._scene
+            # Используем существующую сцену вместо пересоздания
+            if not self._scene:
+                self._scene = NodeScene(self)
+                self.setScene(self._scene)
             
-            if old_scene:
-                try:
-                    # Отключаем все сигналы от старой сцены ПЕРЕД отключением от view
-                    old_scene.blockSignals(True)
-                    try:
-                        # Отключаем все сигналы selectionChanged
-                        old_scene.selectionChanged.disconnect()
-                    except Exception:
-                        pass
-                    
-                    try:
-                        # Отключаем сигнал node_selection_changed
-                        old_scene.node_selection_changed.disconnect()
-                    except Exception:
-                        pass
-                    
-                    # Отключаем старую сцену от view
-                    if self.scene() == old_scene:
-                        self.setScene(None)
-                    
-                    # Очищаем все элементы из старой сцены
-                    try:
-                        # Удаляем все элементы вручную перед clear()
-                        items = list(old_scene.items())
-                        for item in items:
-                            try:
-                                if item.scene() == old_scene:
-                                    old_scene.removeItem(item)
-                            except Exception:
-                                pass
-                        old_scene.clear()
-                    except Exception:
-                        pass
-                    
-                    # Удаляем старую сцену - используем deleteLater() и обрабатываем события
-                    old_scene.setParent(None)
-                    old_scene.deleteLater()
-                    
-                    # Обрабатываем события для немедленного удаления
-                    from PySide6.QtWidgets import QApplication
-                    QApplication.processEvents()
-                    
-                except Exception as e:
-                    print(f"Warning: error cleaning up old scene: {e}")
-                    import traceback
-                    print(traceback.format_exc())
-            
-            # Создаем новую сцену
-            self._scene = NodeScene(self)
-            self.setScene(self._scene)
-            
-            # Восстанавливаем настройки view
-            self.setRenderHint(QPainter.Antialiasing, True)
-            self.setDragMode(QGraphicsView.NoDrag)
-            self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-            self.setBackgroundBrush(self._scene.backgroundBrush())
-            self.setAcceptDrops(True)
-            
-            # Устанавливаем проект и сцену в новую сцену
+            # Безопасно очищаем и устанавливаем новую сцену
             self._scene.set_project_and_scene(project, scene)
             
             # Восстанавливаем центр view
@@ -137,13 +81,7 @@ class NodeView(QGraphicsView):
                 if self._scene:
                     self._scene.set_project_and_scene(project, scene)
             except Exception:
-                # Если и это не работает, создаем новую сцену
-                try:
-                    self._scene = NodeScene(self)
-                    self.setScene(self._scene)
-                    self._scene.set_project_and_scene(project, scene)
-                except Exception:
-                    pass
+                pass
     
     def center_view(self) -> None:
         """Вернуться в центр рабочей области"""

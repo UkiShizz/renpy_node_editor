@@ -54,11 +54,15 @@ class NodeScene(QGraphicsScene):
 
     def set_project_and_scene(self, project: Project, scene: Scene) -> None:
         """Установить проект и сцену, очистить и пересоздать визуальные элементы"""
-        # Просто устанавливаем напрямую без отложенного выполнения
-        # так как теперь сцена пересоздается в NodeView
         try:
-            # Блокируем сигналы
+            # Блокируем сигналы во время очистки
             self.blockSignals(True)
+            
+            # Отключаем сигнал selectionChanged перед очисткой
+            try:
+                self.selectionChanged.disconnect()
+            except Exception:
+                pass
             
             # Очищаем состояние перетаскивания
             if self._drag_connection:
@@ -69,6 +73,54 @@ class NodeScene(QGraphicsScene):
                     pass
                 self._drag_connection = None
             self._drag_src_port = None
+            
+            # Безопасно очищаем все элементы
+            try:
+                # Собираем все элементы
+                items_to_remove = list(self.items())
+                
+                # Сначала очищаем соединения из портов, чтобы избежать проблем
+                for item in items_to_remove:
+                    if isinstance(item, NodeItem):
+                        for port in item.inputs + item.outputs:
+                            if port and hasattr(port, 'connections'):
+                                # Создаем копию списка для безопасной итерации
+                                connections_copy = list(port.connections) if port.connections else []
+                                for conn in connections_copy:
+                                    try:
+                                        if conn.scene() == self:
+                                            self.removeItem(conn)
+                                    except Exception:
+                                        pass
+                                port.connections.clear()
+                
+                # Удаляем ConnectionItem
+                for item in items_to_remove:
+                    if isinstance(item, ConnectionItem):
+                        try:
+                            if item.scene() == self:
+                                self.removeItem(item)
+                        except Exception:
+                            pass
+                
+                # Удаляем NodeItem (порты удалятся автоматически как дочерние элементы)
+                for item in items_to_remove:
+                    if isinstance(item, NodeItem):
+                        try:
+                            if item.scene() == self:
+                                self.removeItem(item)
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"Warning: error clearing items: {e}")
+                import traceback
+                print(traceback.format_exc())
+            
+            # Восстанавливаем сигнал selectionChanged
+            try:
+                self.selectionChanged.connect(self._on_selection_changed)
+            except Exception:
+                pass
             
             # Устанавливаем новую модель
             self._project = project
