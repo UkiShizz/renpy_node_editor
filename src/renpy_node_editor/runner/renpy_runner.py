@@ -138,7 +138,8 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         old_path_str = str(old_path).strip().replace("\\", "/")
         
         # Если путь уже относительный (не абсолютный Windows путь и не Unix абсолютный)
-        if not (len(old_path_str) >= 2 and old_path_str[1] == ":") and not old_path_str.startswith("/"):
+        is_absolute = (len(old_path_str) >= 2 and old_path_str[1] == ":") or old_path_str.startswith("/")
+        if not is_absolute:
             return old_path_str
         
         # Это абсолютный путь - ищем "/game/" в пути (регистронезависимо)
@@ -146,25 +147,41 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
         game_marker = "/game/"
         
         if game_marker in old_path_lower:
-            # Находим позицию "/game/" в оригинальном пути (с учетом регистра)
+            # Находим позицию "/game/" в нижнем регистре
             game_pos_lower = old_path_lower.find(game_marker)
             if game_pos_lower != -1:
-                # Берем часть после "/game/" из оригинального пути
+                # Берем часть после "/game/" из оригинального пути (с учетом регистра)
                 relative_part = old_path_str[game_pos_lower + len(game_marker):]
                 # Убираем ведущие слеши, если есть
                 relative_part = relative_part.lstrip("/")
-                return relative_part
+                if relative_part:  # Если что-то осталось
+                    return relative_part
+        
+        # Также проверяем вариант с обратными слешами
+        if "\\game\\" in old_path_lower or "\\game/" in old_path_lower or "/game\\" in old_path_lower:
+            # Ищем любой вариант "/game/" или "\game\"
+            for marker in ["/game/", "\\game\\", "\\game/", "/game\\"]:
+                pos = old_path_lower.find(marker.lower())
+                if pos != -1:
+                    relative_part = old_path_str[pos + len(marker):]
+                    relative_part = relative_part.lstrip("/\\")
+                    if relative_part:
+                        return relative_part.replace("\\", "/")
         
         # Если не нашли "/game/", пытаемся через Path
         try:
             old_path_obj = Path(old_path)
             game_dir_resolved = game_dir.resolve()
+            old_path_resolved = old_path_obj.resolve()
             
             # Пытаемся вычислить относительный путь
-            if game_dir_resolved in old_path_obj.resolve().parents:
-                relative_path = old_path_obj.resolve().relative_to(game_dir_resolved)
+            try:
+                relative_path = old_path_resolved.relative_to(game_dir_resolved)
                 return str(relative_path).replace("\\", "/")
-        except (ValueError, RuntimeError, OSError):
+            except ValueError:
+                # Путь не находится внутри game_dir
+                pass
+        except (RuntimeError, OSError):
             pass
         
         # Если ничего не помогло, используем имя файла с подпапкой
@@ -181,8 +198,7 @@ def convert_file_paths_to_relative(project: Project, game_dir: Path) -> None:
                 path = block.params.get("path", "")
                 if path:
                     new_path = convert_path(path, "images")
-                    if new_path != path:  # Только обновляем, если путь изменился
-                        block.params["path"] = new_path
+                    block.params["path"] = new_path
             
             # SOUND блоки
             elif block.type == BlockType.SOUND:
@@ -249,7 +265,7 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
     from copy import deepcopy
     modified_project = deepcopy(project)
     
-    # Конвертируем пути к файлам в относительные и копируем файлы
+    # Конвертируем пути к файлам в относительные
     convert_file_paths_to_relative(modified_project, game_dir)
     
     # Изменяем метки сцен, если они конфликтуют с существующими
