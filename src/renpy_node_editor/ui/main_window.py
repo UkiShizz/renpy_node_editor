@@ -350,8 +350,22 @@ class MainWindow(QMainWindow):
             if not base_dir:
                 return
             
-            # Спрашиваем имя проекта, если нужно
-            project_name = self._controller.project.name if self._controller.project else "New Project"
+            # Спрашиваем имя проекта
+            from PySide6.QtWidgets import QInputDialog
+            current_name = self._controller.project.name if self._controller.project else "New Project"
+            project_name, ok = QInputDialog.getText(
+                self,
+                "Имя проекта",
+                "Имя проекта:",
+                text=current_name
+            )
+            if not ok or not project_name:
+                return
+            
+            # Обновляем имя проекта
+            if self._controller.project:
+                self._controller.project.name = project_name
+            
             project_dir = Path(base_dir) / project_name
             
             # Если папка уже существует, спрашиваем подтверждение
