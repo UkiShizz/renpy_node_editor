@@ -163,33 +163,21 @@ def export_to_renpy_project(project: Project, project_dir: Path) -> Path:
             scene.label = new_label
             existing_labels.add(new_label)  # Добавляем в множество, чтобы избежать конфликтов между сценами
     
-    # Генерируем и сохраняем script.rpy
-    # Заменяем существующий script.rpy на сгенерированный код
-    script_path = game_dir / "script.rpy"
+    # Генерируем и сохраняем код
+    if is_existing and (game_dir / "script.rpy").exists():
+        # Для существующего проекта создаем отдельный файл, чтобы не ломать существующий код
+        safe_name = project.name.replace(" ", "_").replace("-", "_")
+        script_path = game_dir / f"{safe_name}_generated.rpy"
+    else:
+        # Для нового проекта используем script.rpy
+        script_path = game_dir / "script.rpy"
     
-    # Извлекаем определения из существующего script.rpy, если он есть
-    existing_definitions = ""
-    if script_path.exists() and is_existing:
-        existing_definitions = extract_definitions_from_script(script_path)
-    
-    # Генерируем новый код
+    # Генерируем код
     generated_code = generate_renpy_script(modified_project)
     
-    # Объединяем определения и сгенерированный код
-    if existing_definitions:
-        # Убираем пустые строки в конце определений
-        existing_definitions = existing_definitions.rstrip()
-        if existing_definitions:
-            # Добавляем разделитель между определениями и сгенерированным кодом
-            final_code = existing_definitions + "\n\n" + generated_code
-        else:
-            final_code = generated_code
-    else:
-        final_code = generated_code
-    
-    # Записываем объединенный код в script.rpy
+    # Записываем сгенерированный код в файл
     with script_path.open("w", encoding="utf-8") as f:
-        f.write(final_code)
+        f.write(generated_code)
     
     # Создаем базовые файлы только для нового проекта
     if not is_existing:
