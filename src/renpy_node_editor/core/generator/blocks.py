@@ -212,7 +212,10 @@ def generate_return(block: Block, indent: str) -> str:
 
 def generate_start(block: Block, indent: str, project_scenes: Optional[list] = None) -> str:
     """Generate start block with its own label"""
+    # Пробуем разные варианты ключей для label
     label = safe_get_str(block.params, "label", "")
+    if not label:
+        label = safe_get_str(block.params, "Имя метки (label):", "")
     
     # Если лейбл не указан, не генерируем код
     if not label:

@@ -54,16 +54,18 @@ def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:
 def find_start_blocks(scene: Scene, connections_map: Dict[str, List[Tuple[str, float]]]) -> List[Block]:
     """
     Find starting blocks (those with no inputs), sorted by position (top to bottom, left to right).
-    Если есть START блок, он всегда является единственным стартовым блоком.
+    Если есть START блоки, они всегда являются стартовыми блоками.
     IMAGE and CHARACTER blocks are excluded from start_blocks even if they have no inputs,
     as they should be in the definitions section, not in the scene flow.
     """
     from renpy_node_editor.core.model import BlockType
     
-    # Сначала ищем START блок - если он есть, он всегда является точкой входа
-    start_block = next((b for b in scene.blocks if b.type == BlockType.START), None)
-    if start_block:
-        return [start_block]
+    # Ищем все START блоки - они всегда являются точками входа
+    start_blocks = [b for b in scene.blocks if b.type == BlockType.START]
+    if start_blocks:
+        # Сортируем по позиции (сверху вниз, слева направо)
+        start_blocks.sort(key=lambda b: (b.y, b.x))
+        return start_blocks
     
     # Если нет START блока, используем старую логику
     has_input: Set[str] = set()

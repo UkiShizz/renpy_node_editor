@@ -282,6 +282,12 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
     reverse_connections = get_reverse_connections(connections_map)
     start_blocks = find_start_blocks(scene, connections_map)
     
+    # Отладочный вывод
+    print(f"DEBUG generate_scene: Сцена {scene.name}, START блоков найдено: {len(start_blocks)}")
+    for sb in start_blocks:
+        label = sb.params.get("label", "")
+        print(f"  START блок {sb.id}: label='{label}', params={sb.params}")
+    
     # Проверяем, есть ли START блоки с label
     has_start_blocks_with_labels = False
     if start_blocks:
@@ -295,8 +301,13 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
     # Поэтому не добавляем generate_label(scene) нигде
     
     if not start_blocks:
+        # Нет START блоков - генерируем все блоки с отступом
+        # Но если это первая сцена и нет label start, нужно создать его
         indent = INDENT
         for block in sorted(scene.blocks, key=lambda b: (b.y, b.x)):
+            # Пропускаем IMAGE и CHARACTER блоки - они в секции определений
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+                continue
             code = generate_block(block, indent, char_name_map, project_scenes)
             if code:
                 lines.append(code)
@@ -449,23 +460,62 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         visited: Set[str] = set()
         
         # Генерируем START блоки и их цепочки
+        print(f"DEBUG: Генерация START блоков. Найдено: {len(start_blocks)}, visited: {len(visited)}")
         for start_block in start_blocks:
+            print(f"DEBUG: Обработка START блока {start_block.id}, visited: {start_block.id in visited}")
             if start_block.id in visited:
                 continue
             
-            start_label = start_block.params.get("label", "")
+            # Пробуем разные варианты ключей для label
+            start_label = start_block.params.get("label", "") or start_block.params.get("Имя метки (label):", "")
+            print(f"DEBUG: START блок {start_block.id}, label='{start_label}', params keys: {list(start_block.params.keys())}")
+            # Если у START блока нет label'а, пропускаем его, но все равно обрабатываем связанные блоки
             if not start_label:
+                print(f"DEBUG: START блок {start_block.id} без label, пропускаем генерацию label")
+                # START блок без label - генерируем только связанные блоки
+                visited.add(start_block.id)
+                visited_for_chain = set()
+                visited_for_chain.add(start_block.id)
+                next_blocks_with_dist = connections_map.get(start_block.id, [])
+                for next_id, _ in next_blocks_with_dist:
+                    if next_id not in visited_for_chain:
+                        chain_code = generate_block_chain(
+                            scene, next_id, connections_map, visited_for_chain, INDENT, 
+                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                        )
+                        if chain_code:
+                            lines.append(chain_code)
+                visited.update(visited_for_chain)
                 continue
             
             # Проверяем, не была ли эта метка уже сгенерирована
             if start_label in generated_labels:
+                # Метка уже сгенерирована - пропускаем генерацию label, но обрабатываем связанные блоки
+                visited.add(start_block.id)
+                visited_for_chain = set()
+                visited_for_chain.add(start_block.id)
+                next_blocks_with_dist = connections_map.get(start_block.id, [])
+                for next_id, _ in next_blocks_with_dist:
+                    if next_id not in visited_for_chain:
+                        chain_code = generate_block_chain(
+                            scene, next_id, connections_map, visited_for_chain, INDENT, 
+                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                        )
+                        if chain_code:
+                            lines.append(chain_code)
+                visited.update(visited_for_chain)
                 continue
             
             # Генерируем label для START блока
+            print(f"DEBUG: Генерация label для START блока {start_block.id} с label '{start_label}'")
             code = generate_block(start_block, "", char_name_map, project_scenes)
+            print(f"DEBUG: Сгенерированный код для START блока: {repr(code)}")
             if code:
                 lines.append(code)
                 generated_labels.add(start_label)
+                print(f"DEBUG: Label '{start_label}' добавлен в generated_labels и в lines")
+            else:
+                print(f"DEBUG: generate_block вернул пустую строку для START блока {start_block.id}")
             
             visited.add(start_block.id)
             
