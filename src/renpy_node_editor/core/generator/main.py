@@ -260,30 +260,42 @@ def generate_block_chain(
         if recursive:
             print(f"DEBUG generate_block_chain: Рекурсивный режим включен, обрабатываем связи блока {start_block_id}")
             # Continue through connections (already sorted by distance)
-            # Обрабатываем все выходы в порядке расстояния (ближайшие первыми)
-            # Это правильно для параллельных веток - они выполняются последовательно в коде
             next_blocks_with_dist = connections_map.get(block.id, [])
             
-            # Обрабатываем все выходы последовательно (в порядке расстояния)
-            for next_id, dist in next_blocks_with_dist:
+            # Для последовательной цепочки обрабатываем только первый выход
+            # Для параллельных веток (когда несколько выходов) обрабатываем все, но в правильном порядке
+            if len(next_blocks_with_dist) == 1:
+                # Один выход - последовательная цепочка, обрабатываем только его
+                next_id, dist = next_blocks_with_dist[0]
                 if next_id not in visited:
-                    # Проверяем, все ли входы этого блока обработаны (для точек слияния)
-                    if reverse_connections:
-                        input_blocks = reverse_connections.get(next_id, set())
-                        # Если есть несколько входов, проверяем, все ли обработаны
-                        if len(input_blocks) > 1:
-                            if not all(inp_id in visited for inp_id in input_blocks):
-                                # Не все входы обработаны - пропускаем пока
-                                # Этот блок будет обработан позже, когда все его входы будут готовы
-                                print(f"DEBUG generate_block_chain: Блок {next_id} имеет необработанные входы: {input_blocks - visited}, пропускаем")
-                                continue
-                    
-                    print(f"DEBUG generate_block_chain: Обрабатываем выход блока {start_block_id}: {next_id} (расстояние: {dist})")
+                    print(f"DEBUG generate_block_chain: Последовательная цепочка - обрабатываем единственный выход {next_id} (расстояние: {dist})")
                     next_code = generate_block_chain(
                         scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes, generated_labels=generated_labels, all_possible_labels=all_possible_labels
                     )
                     if next_code:
                         lines.append(next_code)
+            else:
+                # Несколько выходов - параллельные ветки, обрабатываем все в порядке расстояния
+                print(f"DEBUG generate_block_chain: Параллельные ветки - обрабатываем {len(next_blocks_with_dist)} выходов")
+                for next_id, dist in next_blocks_with_dist:
+                    if next_id not in visited:
+                        # Проверяем, все ли входы этого блока обработаны (для точек слияния)
+                        if reverse_connections:
+                            input_blocks = reverse_connections.get(next_id, set())
+                            # Если есть несколько входов, проверяем, все ли обработаны
+                            if len(input_blocks) > 1:
+                                if not all(inp_id in visited for inp_id in input_blocks):
+                                    # Не все входы обработаны - пропускаем пока
+                                    # Этот блок будет обработан позже, когда все его входы будут готовы
+                                    print(f"DEBUG generate_block_chain: Блок {next_id} имеет необработанные входы: {input_blocks - visited}, пропускаем")
+                                    continue
+                        
+                        print(f"DEBUG generate_block_chain: Обрабатываем выход блока {start_block_id}: {next_id} (расстояние: {dist})")
+                        next_code = generate_block_chain(
+                            scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes, generated_labels=generated_labels, all_possible_labels=all_possible_labels
+                        )
+                        if next_code:
+                            lines.append(next_code)
     
     return "".join(lines)
 
