@@ -281,16 +281,53 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
         visited: Set[str] = set()
         
         # Обрабатываем блоки в топологическом порядке
-        # В топологической сортировке обрабатываем только сам блок, без рекурсии
-        # (потомки будут обработаны позже в правильном порядке)
-        for block_id in sorted_block_ids:
+        # Важно: когда блок разветвляется на несколько блоков, обрабатываем все эти блоки
+        # перед переходом к следующему блоку в топологической сортировке
+        i = 0
+        while i < len(sorted_block_ids):
+            block_id = sorted_block_ids[i]
+            
             if block_id not in visited:
-                # Генерируем код только для этого блока (без рекурсии)
+                # Генерируем код для этого блока
                 code = generate_block_chain(
                     scene, block_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
                 )
                 if code:
                     lines.append(code)
+                
+                # Проверяем, разветвляется ли этот блок на несколько блоков
+                next_blocks_with_dist = connections_map.get(block_id, [])
+                if len(next_blocks_with_dist) > 1:
+                    # Это разветвление - обрабатываем все параллельные ветки
+                    # Сортируем по позиции (сверху вниз, слева направо)
+                    next_blocks_sorted = sorted(
+                        next_blocks_with_dist,
+                        key=lambda x: (
+                            next((b.y for b in scene.blocks if b.id == x[0]), 0),
+                            next((b.x for b in scene.blocks if b.id == x[0]), 0)
+                        )
+                    )
+                    
+                    # Обрабатываем все параллельные ветки
+                    for next_id, _ in next_blocks_sorted:
+                        if next_id not in visited:
+                            # Проверяем, все ли входы этого блока обработаны (для точек слияния)
+                            if reverse_connections:
+                                input_blocks = reverse_connections.get(next_id, set())
+                                if len(input_blocks) > 1:
+                                    # Это точка слияния - проверяем, все ли входы обработаны
+                                    if not all(inp_id in visited for inp_id in input_blocks):
+                                        # Не все входы обработаны - пропускаем пока
+                                        continue
+                            
+                            # Обрабатываем блок параллельной ветки
+                            branch_code = generate_block_chain(
+                                scene, next_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
+                            )
+                            if branch_code:
+                                lines.append(branch_code)
+            
+            i += 1
         
         # Add unprocessed blocks (блоки без соединений)
         # IMAGE и CHARACTER блоки не генерируются здесь - они в секции определений

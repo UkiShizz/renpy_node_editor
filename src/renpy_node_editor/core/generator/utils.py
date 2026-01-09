@@ -129,6 +129,7 @@ def topological_sort_blocks(
     """
     Топологическая сортировка блоков для правильного порядка обработки.
     Возвращает список ID блоков в правильном порядке.
+    При параллельных ветках сортирует по позиции (сверху вниз, слева направо).
     """
     from renpy_node_editor.core.model import BlockType
     
@@ -137,6 +138,9 @@ def topological_sort_blocks(
         block.id for block in scene.blocks
         if block.type not in (BlockType.IMAGE, BlockType.CHARACTER)
     ]
+    
+    # Создаем словарь для быстрого доступа к блокам
+    block_map: Dict[str, Block] = {block.id: block for block in scene.blocks}
     
     # Вычисляем количество необработанных входов для каждого блока
     in_degree: Dict[str, int] = {}
@@ -149,11 +153,15 @@ def topological_sort_blocks(
         if in_degree[block_id] == 0
     ]
     
+    # Функция для получения позиции блока
+    def get_position(block_id: str) -> Tuple[float, float]:
+        block = block_map.get(block_id)
+        if block:
+            return (block.y, block.x)
+        return (0.0, 0.0)
+    
     # Сортируем стартовые блоки по позиции (сверху вниз, слева направо)
-    queue.sort(key=lambda bid: (
-        next((b.y for b in scene.blocks if b.id == bid), 0),
-        next((b.x for b in scene.blocks if b.id == bid), 0)
-    ))
+    queue.sort(key=get_position)
     
     result: List[str] = []
     
@@ -163,16 +171,20 @@ def topological_sort_blocks(
         result.append(current)
         
         # Обрабатываем все выходы этого блока
-        for next_id, _ in connections_map.get(current, []):
+        # Сортируем выходы по позиции для правильного порядка параллельных веток
+        next_blocks_with_dist = connections_map.get(current, [])
+        next_blocks_sorted = sorted(
+            next_blocks_with_dist,
+            key=lambda x: get_position(x[0])
+        )
+        
+        for next_id, _ in next_blocks_sorted:
             if next_id in block_ids:
                 in_degree[next_id] -= 1
                 if in_degree[next_id] == 0:
                     queue.append(next_id)
                     # Сортируем очередь по позиции
-                    queue.sort(key=lambda bid: (
-                        next((b.y for b in scene.blocks if b.id == bid), 0),
-                        next((b.x for b in scene.blocks if b.id == bid), 0)
-                    ))
+                    queue.sort(key=get_position)
     
     return result
 
