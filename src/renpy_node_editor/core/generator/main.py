@@ -275,26 +275,21 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if code:
                 lines.append(code)
     else:
-        # Используем простой обход графа с обработкой всех параллельных веток
+        # Используем рекурсивный обход с обработкой всех параллельных веток
         visited: Set[str] = set()
         
-        def can_process_block(block_id: str) -> bool:
-            """Проверяет, можно ли обработать блок (все входы обработаны)"""
+        def process_block_recursive(block_id: str) -> None:
+            """Рекурсивно обрабатывает блок и все его потомки до точек слияния"""
             if block_id in visited:
-                return False
+                return
             
+            # Проверяем, все ли входы блока обработаны (для точек слияния)
             if reverse_connections:
                 input_blocks = reverse_connections.get(block_id, set())
-                if input_blocks:
-                    # Проверяем, все ли входы обработаны
-                    return all(inp_id in visited for inp_id in input_blocks)
-            
-            return True
-        
-        def process_block_simple(block_id: str) -> None:
-            """Просто обрабатывает один блок"""
-            if not can_process_block(block_id):
-                return
+                if len(input_blocks) > 1:
+                    # Это точка слияния - проверяем, все ли входы обработаны
+                    if not all(inp_id in visited for inp_id in input_blocks):
+                        return
             
             # Генерируем код для этого блока
             code = generate_block_chain(
@@ -302,51 +297,89 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             )
             if code:
                 lines.append(code)
+            
+            # Получаем все выходы этого блока
+            next_blocks_with_dist = connections_map.get(block_id, [])
+            
+            if len(next_blocks_with_dist) > 1:
+                # Это разветвление - обрабатываем все параллельные ветки полностью
+                # Сортируем по позиции (сверху вниз, слева направо)
+                next_blocks_sorted = sorted(
+                    next_blocks_with_dist,
+                    key=lambda x: (
+                        next((b.y for b in scene.blocks if b.id == x[0]), 0),
+                        next((b.x for b in scene.blocks if b.id == x[0]), 0)
+                    )
+                )
+                
+                # Обрабатываем каждую параллельную ветку полностью до точки слияния
+                for next_id, _ in next_blocks_sorted:
+                    if next_id not in visited:
+                        # Обрабатываем всю цепочку этой ветки до точки слияния
+                        process_chain_until_merge(next_id)
+            elif len(next_blocks_with_dist) == 1:
+                # Один выход - обрабатываем его рекурсивно
+                next_id = next_blocks_with_dist[0][0]
+                if next_id not in visited:
+                    process_block_recursive(next_id)
         
-        # Многопроходная обработка: обрабатываем блоки, пока есть что обрабатывать
-        max_iterations = len(scene.blocks) * 3
+        def process_chain_until_merge(block_id: str) -> None:
+            """Обрабатывает цепочку блоков до точки слияния или разветвления"""
+            current_id = block_id
+            
+            while current_id and current_id not in visited:
+                # Проверяем, все ли входы блока обработаны (для точек слияния)
+                if reverse_connections:
+                    input_blocks = reverse_connections.get(current_id, set())
+                    if len(input_blocks) > 1:
+                        # Это точка слияния - проверяем, все ли входы обработаны
+                        if not all(inp_id in visited for inp_id in input_blocks):
+                            # Не все входы обработаны - останавливаемся
+                            break
+                
+                # Генерируем код для этого блока
+                code = generate_block_chain(
+                    scene, current_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
+                )
+                if code:
+                    lines.append(code)
+                
+                # Получаем выходы этого блока
+                next_blocks_with_dist = connections_map.get(current_id, [])
+                
+                if len(next_blocks_with_dist) > 1:
+                    # Это разветвление - обрабатываем его рекурсивно
+                    process_block_recursive(current_id)
+                    break
+                elif len(next_blocks_with_dist) == 1:
+                    # Один выход - продолжаем цепочку
+                    current_id = next_blocks_with_dist[0][0]
+                else:
+                    # Нет выходов - конец цепочки
+                    break
+        
+        # Обрабатываем все стартовые блоки
+        for start_block in start_blocks:
+            if start_block.id not in visited:
+                process_block_recursive(start_block.id)
+        
+        # Многопроходная обработка для оставшихся блоков (точки слияния)
+        max_iterations = len(scene.blocks) * 2
         for iteration in range(max_iterations):
             progress_made = False
             
-            # Сначала обрабатываем стартовые блоки
-            for start_block in start_blocks:
-                if can_process_block(start_block.id):
-                    process_block_simple(start_block.id)
-                    progress_made = True
-            
-            # Затем обрабатываем остальные блоки
             for block in scene.blocks:
-                if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
-                    continue
-                
-                if can_process_block(block.id):
-                    # Получаем выходы этого блока
-                    next_blocks_with_dist = connections_map.get(block.id, [])
+                if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
+                    # Проверяем, все ли входы блока обработаны
+                    if reverse_connections:
+                        input_blocks = reverse_connections.get(block.id, set())
+                        if input_blocks:
+                            if not all(inp_id in visited for inp_id in input_blocks):
+                                continue
                     
-                    if len(next_blocks_with_dist) > 1:
-                        # Это разветвление - обрабатываем все параллельные ветки
-                        # Сортируем по позиции (сверху вниз, слева направо)
-                        next_blocks_sorted = sorted(
-                            next_blocks_with_dist,
-                            key=lambda x: (
-                                next((b.y for b in scene.blocks if b.id == x[0]), 0),
-                                next((b.x for b in scene.blocks if b.id == x[0]), 0)
-                            )
-                        )
-                        
-                        # Обрабатываем сам блок
-                        process_block_simple(block.id)
-                        progress_made = True
-                        
-                        # Обрабатываем все параллельные ветки последовательно
-                        for next_id, _ in next_blocks_sorted:
-                            if can_process_block(next_id):
-                                process_block_simple(next_id)
-                                progress_made = True
-                    else:
-                        # Обычный блок - обрабатываем его
-                        process_block_simple(block.id)
-                        progress_made = True
+                    # Все входы обработаны - обрабатываем блок
+                    process_block_recursive(block.id)
+                    progress_made = True
             
             if not progress_made:
                 break
