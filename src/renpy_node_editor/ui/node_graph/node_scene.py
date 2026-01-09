@@ -476,7 +476,8 @@ class NodeScene(QGraphicsScene):
                         item
                     )
                     
-                    connection_id = str(id(self._drag_connection))
+                    # Используем UUID для стабильного ID connection
+                    connection_id = str(uuid.uuid4())
                     connection = Connection(
                         id=connection_id,
                         from_port_id=from_port_id,
