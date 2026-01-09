@@ -25,7 +25,10 @@ def generate_say(block: Block, indent: str) -> str:
     who = safe_get_str(block.params, "who")
     text = safe_get_str(block.params, "text")
     
+    print(f"DEBUG generate_say: Блок {block.id}, who='{who}', text='{text}', params keys: {list(block.params.keys())}")
+    
     if not text:
+        print(f"DEBUG generate_say: Текст пустой, возвращаем пустую строку")
         return ""
     
     text = escape_text(text)

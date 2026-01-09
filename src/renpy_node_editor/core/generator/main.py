@@ -105,7 +105,10 @@ def generate_say_with_mapping(block: Block, indent: str, char_name_map: Dict[str
     who = safe_get_str(block.params, "who")
     text = safe_get_str(block.params, "text")
     
+    print(f"DEBUG generate_say_with_mapping: Блок {block.id}, who='{who}', text='{text}', params keys: {list(block.params.keys())}")
+    
     if not text:
+        print(f"DEBUG generate_say_with_mapping: Текст пустой, возвращаем пустую строку")
         return ""
     
     text = escape_text(text)
