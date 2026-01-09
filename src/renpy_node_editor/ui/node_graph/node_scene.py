@@ -225,8 +225,11 @@ class NodeScene(QGraphicsScene):
             return
         
         # Создаем маппинг port_id -> PortItem
+        # Сначала создаем маппинг по сохраненным портам из модели
         port_items: dict[str, PortItem] = {}
         try:
+            # Сначала создаем маппинг всех портов из модели на их PortItem
+            # Это важно для правильного восстановления connections
             items = list(self.items())
             for item in items:
                 if isinstance(item, NodeItem):
@@ -235,30 +238,40 @@ class NodeScene(QGraphicsScene):
                         if not item.scene() or not item.block:
                             continue
                         # Проверяем, что блок еще существует в модели
-                        if not self._scene_model.find_block(item.block.id):
+                        block = self._scene_model.find_block(item.block.id)
+                        if not block:
                             continue
                         
-                        for port in item.inputs + item.outputs:
-                            # Проверяем, что порт еще существует
-                            if not port:
-                                continue
-                            try:
-                                if not port.scene():
-                                    continue
-                            except (RuntimeError, AttributeError):
+                        # Ищем порты из модели для этого блока
+                        for model_port in self._scene_model.ports:
+                            if model_port.node_id != block.id:
                                 continue
                             
-                            # Нужно найти port_id для этого порта
-                            # Для этого создадим порты в модели если их нет
-                            try:
-                                port_id = self._get_or_create_port_id(item.block, port)
-                                port_items[port_id] = port
-                            except Exception:
-                                continue
+                            # Ищем соответствующий PortItem по имени и направлению
+                            for port_item in item.inputs + item.outputs:
+                                if not port_item:
+                                    continue
+                                try:
+                                    if not port_item.scene():
+                                        continue
+                                except (RuntimeError, AttributeError):
+                                    continue
+                                
+                                # Проверяем соответствие по имени и направлению
+                                is_output = port_item.is_output
+                                port_direction_match = (
+                                    (model_port.direction == PortDirection.OUTPUT and is_output) or
+                                    (model_port.direction == PortDirection.INPUT and not is_output)
+                                )
+                                
+                                if model_port.name == port_item.name and port_direction_match:
+                                    # Нашли соответствие - сохраняем маппинг
+                                    port_items[model_port.id] = port_item
+                                    break
                     except (RuntimeError, AttributeError):
                         continue
             
-            # Создаем связи
+            # Теперь создаем связи, используя правильные port_id из модели
             for conn in self._scene_model.connections:
                 try:
                     src_port_item = port_items.get(conn.from_port_id)
@@ -283,6 +296,10 @@ class NodeScene(QGraphicsScene):
                             dst_port_item.add_connection(connection_item)
                         except Exception:
                             continue
+                    else:
+                        # Если порты не найдены, это может быть проблема с сохранением/загрузкой
+                        # Пропускаем эту связь, но не падаем
+                        pass
                 except (AttributeError, RuntimeError):
                     continue
         except Exception:
