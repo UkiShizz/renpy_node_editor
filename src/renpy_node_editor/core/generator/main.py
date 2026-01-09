@@ -270,15 +270,29 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
     """Generate code for a scene"""
     lines: List[str] = []
     
-    lines.append(generate_label(scene))
-    
     if not scene.blocks:
+        # Пустая сцена - генерируем только label с pass
+        lines.append(generate_label(scene))
         lines.append(f"{INDENT}pass\n\n")
         return "".join(lines)
     
     connections_map = get_block_connections(scene)
     reverse_connections = get_reverse_connections(connections_map)
     start_blocks = find_start_blocks(scene, connections_map)
+    
+    # Проверяем, есть ли START блоки с label
+    has_start_blocks_with_labels = False
+    if start_blocks:
+        for start_block in start_blocks:
+            start_label = start_block.params.get("label", "")
+            if start_label:
+                has_start_blocks_with_labels = True
+                break
+    
+    # Если есть START блоки с label, они генерируются на верхнем уровне (без label сцены)
+    # Если нет START блоков или они без label, генерируем label сцены
+    if not has_start_blocks_with_labels:
+        lines.append(generate_label(scene))
     
     if not start_blocks:
         indent = INDENT
@@ -433,6 +447,9 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         blocks_to_generate.sort(key=lambda x: (x[1], x[2]))  # Сортируем по level, затем sublevel
         
         visited: Set[str] = set()
+        current_indent = INDENT if not has_start_blocks_with_labels else INDENT  # Отступ для блоков после label
+        in_start_label = False  # Флаг, что мы внутри label START блока
+        
         for block_id, _, _ in blocks_to_generate:
             if block_id in visited:
                 continue
@@ -447,15 +464,19 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                 visited.add(block_id)
                 continue
             
-            # START блоки генерируются, если у них есть label
+            # START блоки генерируются на верхнем уровне (без отступа), если у них есть label
             if block.type == BlockType.START:
-                code = generate_block(block, INDENT, char_name_map, project_scenes)
+                # START блоки генерируют label на верхнем уровне, без отступа
+                code = generate_block(block, "", char_name_map, project_scenes)
                 if code:
                     lines.append(code)
+                    in_start_label = True  # Теперь мы внутри label START блока
                 visited.add(block_id)
                 continue
             
-            code = generate_block(block, INDENT, char_name_map, project_scenes)
+            # Блоки после START блока генерируются с отступом внутри label START блока
+            # Или с отступом внутри label сцены, если нет START блоков
+            code = generate_block(block, current_indent, char_name_map, project_scenes)
             if code:
                 lines.append(code)
             visited.add(block_id)
@@ -463,8 +484,11 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         # Обрабатываем блоки без соединений
         for block in scene.blocks:
             if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
-                # START блоки тоже обрабатываем, если они не были обработаны
-                code = generate_block(block, INDENT, char_name_map, project_scenes)
+                # START блоки генерируются на верхнем уровне (без отступа)
+                if block.type == BlockType.START:
+                    code = generate_block(block, "", char_name_map, project_scenes)
+                else:
+                    code = generate_block(block, INDENT, char_name_map, project_scenes)
                 if code:
                     lines.append(code)
     

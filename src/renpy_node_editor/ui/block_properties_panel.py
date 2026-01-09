@@ -879,6 +879,9 @@ class BlockPropertiesPanel(QWidget):
         combo.setToolTip(tooltip)
         combo.setStyleSheet(self._get_combo_style())
         
+        # ВАЖНО: добавляем комбобокс в layout!
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, combo)
+        
         self._param_widgets[key] = combo
     
     def _get_defined_images(self) -> Dict[str, str]:
