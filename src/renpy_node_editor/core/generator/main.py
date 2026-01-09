@@ -359,9 +359,12 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                     )
                     
                     # Обрабатываем каждую параллельную ветку полностью до точки слияния
+                    # Важно: обрабатываем все ветки последовательно, каждая полностью
                     for next_id, _ in next_blocks_sorted:
                         if next_id not in visited:
+                            # Обрабатываем всю цепочку этой ветки до точки слияния
                             process_chain_dfs(next_id)
+                    # После обработки всех параллельных веток, выходим из цикла
                     break
                 elif len(next_blocks_with_dist) == 1:
                     # Один выход - продолжаем цепочку
@@ -376,11 +379,18 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                 process_block_dfs(start_block.id)
         
         # Многопроходная обработка для оставшихся блоков (точки слияния)
-        max_iterations = len(scene.blocks) * 2
+        # Обрабатываем блоки, пока есть что обрабатывать
+        max_iterations = len(scene.blocks) * 3
         for iteration in range(max_iterations):
             progress_made = False
             
-            for block in scene.blocks:
+            # Сортируем блоки по позиции для более предсказуемого порядка
+            blocks_sorted = sorted(
+                scene.blocks,
+                key=lambda b: (b.y, b.x)
+            )
+            
+            for block in blocks_sorted:
                 if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
                     # Проверяем, все ли входы блока обработаны
                     if reverse_connections:
