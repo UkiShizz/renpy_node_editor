@@ -547,26 +547,40 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             visited_for_chain.add(start_block.id)
             
             # Получаем блоки, связанные с START блоком
+            # Обрабатываем только первый связанный блок (самый близкий по расстоянию)
+            # Остальные блоки будут обработаны через цепочку соединений
             next_blocks_with_dist = connections_map.get(start_block.id, [])
             print(f"DEBUG: START блок {start_block.id} имеет {len(next_blocks_with_dist)} связанных блоков")
-            for next_id, dist in next_blocks_with_dist:
-                print(f"  Связанный блок: {next_id}, расстояние: {dist}")
-                if next_id not in visited_for_chain:
-                    print(f"DEBUG: Генерация цепочки для блока {next_id} после START блока {start_block.id}")
+            
+            if next_blocks_with_dist:
+                # Берем первый блок (самый близкий по расстоянию)
+                first_next_id, first_dist = next_blocks_with_dist[0]
+                print(f"DEBUG: Обрабатываем первый связанный блок {first_next_id} (расстояние: {first_dist})")
+                
+                if first_next_id not in visited_for_chain:
+                    print(f"DEBUG: Генерация цепочки для блока {first_next_id} после START блока {start_block.id}")
                     chain_code = generate_block_chain(
-                        scene, next_id, connections_map, visited_for_chain, INDENT, 
+                        scene, first_next_id, connections_map, visited_for_chain, INDENT, 
                         char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
                         generated_labels=generated_labels, all_possible_labels=all_possible_labels
                     )
-                    print(f"DEBUG: Сгенерированный код цепочки для блока {next_id}: {repr(chain_code[:100]) if chain_code else 'пусто'}")
+                    print(f"DEBUG: Сгенерированный код цепочки для блока {first_next_id}: {repr(chain_code[:100]) if chain_code else 'пусто'}")
                     if chain_code:
                         lines.append(chain_code)
                 else:
-                    print(f"DEBUG: Блок {next_id} уже в visited_for_chain, пропускаем")
+                    print(f"DEBUG: Блок {first_next_id} уже в visited_for_chain, пропускаем")
+                
+                # Остальные блоки (если есть) будут обработаны позже, если они не в цепочке
+                if len(next_blocks_with_dist) > 1:
+                    print(f"DEBUG: Есть еще {len(next_blocks_with_dist) - 1} связанных блоков, они будут обработаны через цепочку или как блоки без соединений")
             
             # Отмечаем все обработанные блоки как visited
             print(f"DEBUG: Обработано блоков в цепочке после START {start_block.id}: {len(visited_for_chain)}")
             visited.update(visited_for_chain)
+            
+            # НЕ добавляем return автоматически в конце label'ов
+            # return должен быть только один раз в конце label start:
+            # Пользователь может добавить return через RETURN блок, если нужно
         
         # Генерируем оставшиеся блоки (не связанные с START блоками)
         for block_id, _, _ in blocks_to_generate:
@@ -810,17 +824,35 @@ def generate_renpy_script(project: Project) -> str:
     
     print(f"DEBUG: Всего возможных label'ов для проверки JUMP/CALL: {sorted(all_possible_labels)}")
     
-    # Проверяем, есть ли метка start в START блоках
-    has_start_label = "start" in all_possible_labels
+    # Всегда создаем label start: в начале (после определений, перед сценами)
+    # Это стандартная практика Ren'Py - метка start обязательна как точка входа в игру
+    # label start: создается ОДИН РАЗ в начале, return - ОДИН РАЗ в конце
+    lines.append("\n# Игра начинается здесь:\n")
+    lines.append("label start:\n")
     
-    # Если нет метки start, создаем её в начале (после определений, перед сценами)
-    # Это стандартная практика Ren'Py - метка start обычно идет в начале файла
-    # НЕ создаем автоматический jump - пользователь должен явно указать его через JUMP блок
-    if not has_start_label:
-        lines.append("\n# Main entry point\n")
-        lines.append("label start:\n")
-        lines.append("    return\n\n")
-        generated_labels.add("start")
+    # Если есть START блоки, делаем jump к первому
+    if all_possible_labels:
+        # Находим первый START блок с label
+        first_start_label = None
+        for scene in project.scenes:
+            for block in scene.blocks:
+                if block.type == BlockType.START:
+                    start_label = safe_get_str(block.params, "label", "") or safe_get_str(block.params, "Имя метки (label):", "")
+                    if start_label:
+                        first_start_label = start_label
+                        break
+            if first_start_label:
+                break
+        
+        if first_start_label:
+            lines.append(f"    jump {first_start_label}\n")
+        else:
+            lines.append("    return\n")
+    else:
+        # Нет START блоков - просто return
+        lines.append("    return\n")
+    
+    generated_labels.add("start")
     
     # Generate scenes in the same order as they appear in the scenes list
     # Порядок генерации соответствует порядку сцен в списке

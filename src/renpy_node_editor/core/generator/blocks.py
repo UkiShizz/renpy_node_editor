@@ -245,6 +245,7 @@ def generate_start(block: Block, indent: str, project_scenes: Optional[list] = N
         return ""
     
     # Генерируем label для START блока
+    # НЕ добавляем return здесь - он будет добавлен в конце сцены, если нужно
     return f"{indent}label {label}:\n"
 
 
