@@ -198,17 +198,23 @@ def generate_block_chain(
             from renpy_node_editor.core.generator.blocks import generate_for
             lines.append(generate_for(block, indent, loop_body))
     else:
-        code = generate_block(block, indent, char_name_map)
-        if code:
-            lines.append(code)
+        # IMAGE и CHARACTER блоки не генерируются в цепочке - они в секции определений
+        if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+            # Пропускаем генерацию, но продолжаем цепочку
+            pass
+        else:
+            code = generate_block(block, indent, char_name_map)
+            if code:
+                lines.append(code)
         
         # Continue through connections (already sorted by distance)
         # Process shorter connections first for parallel branches
+        # ВАЖНО: используем то же множество visited, чтобы избежать дублирования
         next_blocks_with_dist = connections_map.get(block.id, [])
         for next_id, _ in next_blocks_with_dist:
             if next_id not in visited:
                 next_code = generate_block_chain(
-                    scene, next_id, connections_map, visited.copy(), indent, char_name_map
+                    scene, next_id, connections_map, visited, indent, char_name_map
                 )
                 if next_code:
                     lines.append(next_code)
@@ -236,30 +242,21 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if code:
                 lines.append(code)
     else:
+        # Используем одно общее множество visited для всех цепочек
+        # чтобы избежать дублирования блоков
         visited: Set[str] = set()
         for start_block in start_blocks:
-            code = generate_block_chain(
-                scene, start_block.id, connections_map, visited.copy(), INDENT, char_name_map
-            )
-            if code:
-                lines.append(code)
+            if start_block.id not in visited:
+                code = generate_block_chain(
+                    scene, start_block.id, connections_map, visited, INDENT, char_name_map
+                )
+                if code:
+                    lines.append(code)
         
-        # Add unprocessed blocks
-        processed = set()
-        for start_block in start_blocks:
-            processed.add(start_block.id)
-            stack = [start_block.id]
-            while stack:
-                current_id = stack.pop()
-                # Extract block IDs from (block_id, distance) tuples
-                next_blocks_with_dist = connections_map.get(current_id, [])
-                for next_id, _ in next_blocks_with_dist:
-                    if next_id not in processed:
-                        processed.add(next_id)
-                        stack.append(next_id)
-        
+        # Add unprocessed blocks (блоки без соединений)
+        # IMAGE и CHARACTER блоки не генерируются здесь - они в секции определений
         for block in scene.blocks:
-            if block.id not in processed:
+            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
                 code = generate_block(block, INDENT, char_name_map)
                 if code:
                     lines.append(code)
@@ -295,16 +292,47 @@ def extract_characters(project: Project) -> Set[str]:
     return characters
 
 
+def extract_image_blocks(project: Project) -> Dict[str, str]:
+    """
+    Извлекает все IMAGE блоки из всех сцен проекта.
+    Возвращает словарь {имя: путь}
+    """
+    from renpy_node_editor.core.generator.blocks import safe_get_str
+    
+    images: Dict[str, str] = {}
+    
+    for scene in project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.IMAGE:
+                name = safe_get_str(block.params, "name")
+                path = safe_get_str(block.params, "path")
+                if name and path:
+                    # Нормализуем имя
+                    normalized_name = normalize_variable_name(name)
+                    images[normalized_name] = path
+    
+    return images
+
+
 def generate_definitions(project: Project) -> str:
     """Generate global definitions (define, default, image)"""
     lines: List[str] = []
     
-    # Image definitions
-    if project.images:
+    # Image definitions - собираем из всех IMAGE блоков в сценах
+    images = extract_image_blocks(project)
+    if images:
         lines.append("# Image Definitions\n")
-        for name, path in sorted(project.images.items()):
+        for name, path in sorted(images.items()):
             lines.append(f"image {name} = \"{path}\"\n")
         lines.append("\n")
+    
+    # Также добавляем изображения из project.images (если есть)
+    if project.images:
+        for name, path in sorted(project.images.items()):
+            if name not in images:  # Не дублируем
+                lines.append(f"image {name} = \"{path}\"\n")
+        if project.images and not images:
+            lines.append("\n")
     
     # Character definitions
     if project.characters:

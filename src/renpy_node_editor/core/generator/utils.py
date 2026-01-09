@@ -52,16 +52,53 @@ def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:
 
 
 def find_start_blocks(scene: Scene, connections_map: Dict[str, List[Tuple[str, float]]]) -> List[Block]:
-    """Find starting blocks (those with no inputs), sorted by position (top to bottom, left to right)"""
+    """
+    Find starting blocks (those with no inputs), sorted by position (top to bottom, left to right).
+    IMAGE and CHARACTER blocks are excluded from start_blocks even if they have no inputs,
+    as they should be in the definitions section, not in the scene flow.
+    """
     has_input: Set[str] = set()
     for targets_with_dist in connections_map.values():
         # Extract block IDs from (block_id, distance) tuples
         has_input.update(block_id for block_id, _ in targets_with_dist)
     
-    start_blocks = [b for b in scene.blocks if b.id not in has_input]
+    # Исключаем IMAGE и CHARACTER блоки из start_blocks
+    # Они должны быть в секции определений, а не в начале сцены
+    from renpy_node_editor.core.model import BlockType
+    start_blocks = [
+        b for b in scene.blocks 
+        if b.id not in has_input and b.type not in (BlockType.IMAGE, BlockType.CHARACTER)
+    ]
+    
+    # Если все блоки - IMAGE/CHARACTER, но есть соединения, 
+    # нужно найти первый блок после них (например, SCENE)
+    if not start_blocks and connections_map:
+        # Находим блоки, которые подключены от IMAGE/CHARACTER
+        image_char_ids = {
+            b.id for b in scene.blocks 
+            if b.type in (BlockType.IMAGE, BlockType.CHARACTER)
+        }
+        # Блоки, которые подключены от IMAGE/CHARACTER
+        next_after_image_char = set()
+        for block_id in image_char_ids:
+            if block_id in connections_map:
+                next_after_image_char.update(
+                    target_id for target_id, _ in connections_map[block_id]
+                )
+        # Если есть такие блоки, используем их как start_blocks
+        if next_after_image_char:
+            start_blocks = [
+                b for b in scene.blocks 
+                if b.id in next_after_image_char and b.type not in (BlockType.IMAGE, BlockType.CHARACTER)
+            ]
     
     if not connections_map:
-        return sorted(scene.blocks, key=lambda b: (b.y, b.x))
+        # Если нет соединений, возвращаем все блоки кроме IMAGE/CHARACTER
+        from renpy_node_editor.core.model import BlockType
+        return sorted(
+            [b for b in scene.blocks if b.type not in (BlockType.IMAGE, BlockType.CHARACTER)],
+            key=lambda b: (b.y, b.x)
+        )
     
     # Sort start blocks by position (top to bottom, left to right)
     return sorted(start_blocks, key=lambda b: (b.y, b.x))
