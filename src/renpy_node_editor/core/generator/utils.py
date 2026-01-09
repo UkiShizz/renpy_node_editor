@@ -104,6 +104,18 @@ def find_start_blocks(scene: Scene, connections_map: Dict[str, List[Tuple[str, f
     return sorted(start_blocks, key=lambda b: (b.y, b.x))
 
 
+def get_reverse_connections(connections_map: Dict[str, List[Tuple[str, float]]]) -> Dict[str, Set[str]]:
+    """
+    Create reverse mapping: block_id -> set of block_ids that connect to it.
+    This helps identify merge points (blocks that receive inputs from multiple sources).
+    """
+    reverse_map: Dict[str, Set[str]] = defaultdict(set)
+    for from_block_id, targets_with_dist in connections_map.items():
+        for to_block_id, _ in targets_with_dist:
+            reverse_map[to_block_id].add(from_block_id)
+    return reverse_map
+
+
 def escape_text(text: str) -> str:
     """Escape quotes in text"""
     return text.replace('"', '\\"')
