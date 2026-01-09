@@ -391,13 +391,16 @@ class BlockPropertiesPanel(QWidget):
                 "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)"
             )
             if file_path:
-                # Используем имя файла без расширения как имя изображения
-                # Пользователь может изменить это вручную
                 from pathlib import Path
                 filename = Path(file_path).stem
                 # Предлагаем имя в формате "bg filename"
                 suggested_name = f"bg {filename}" if not filename.startswith("bg ") else filename
                 combo.setCurrentText(suggested_name)
+                
+                # Сохраняем путь к файлу во временное хранилище для создания IMAGE блока
+                if not hasattr(self, '_background_file_paths'):
+                    self._background_file_paths = {}
+                self._background_file_paths[key] = file_path
         
         browse_btn.clicked.connect(on_browse_clicked)
         bg_container.addWidget(browse_btn)
@@ -781,6 +784,44 @@ class BlockPropertiesPanel(QWidget):
                 text = widget.currentText().strip()
                 # Сохраняем пустую строку вместо None для пустых значений
                 self.current_block.params[key] = text if text else ""
+                
+                # Если это background для SCENE блока и был выбран файл - создаем IMAGE блок
+                if key == "background" and self.current_block.type == BlockType.SCENE and text:
+                    if hasattr(self, '_background_file_paths') and key in self._background_file_paths:
+                        file_path = self._background_file_paths[key]
+                        # Проверяем, определено ли уже это изображение
+                        scene = self._get_current_scene()
+                        if scene:
+                            image_exists = False
+                            for block in scene.blocks:
+                                if block.type == BlockType.IMAGE:
+                                    image_name = block.params.get("name", "")
+                                    if image_name == text:
+                                        image_exists = True
+                                        break
+                            
+                            if not image_exists:
+                                # Создаем IMAGE блок автоматически
+                                import uuid
+                                from pathlib import Path
+                                
+                                # Конвертируем путь в относительный (будет обработан при экспорте)
+                                image_path = str(file_path)
+                                
+                                image_block = Block(
+                                    id=str(uuid.uuid4()),
+                                    type=BlockType.IMAGE,
+                                    params={
+                                        "name": text,
+                                        "path": image_path
+                                    },
+                                    x=self.current_block.x - 250,  # Слева от SCENE блока
+                                    y=self.current_block.y
+                                )
+                                scene.add_block(image_block)
+                                
+                                # Уведомляем сцену о новом блоке
+                                self._notify_scene_about_new_block(image_block)
         
         # Сохраняем варианты меню
         if "_choices_data" in self._param_widgets:
@@ -789,3 +830,30 @@ class BlockPropertiesPanel(QWidget):
         
         # Emit signal to notify that properties were saved
         self.properties_saved.emit(self.current_block)
+    
+    def _get_current_scene(self):
+        """Получить текущую сцену"""
+        # Пытаемся получить сцену через parent
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'node_view'):
+                node_view = parent.node_view
+                if hasattr(node_view, 'node_scene'):
+                    scene = node_view.node_scene
+                    if hasattr(scene, '_scene_model'):
+                        return scene._scene_model
+            parent = parent.parent()
+        return None
+    
+    def _notify_scene_about_new_block(self, block: Block) -> None:
+        """Уведомить сцену о новом блоке для отображения"""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'node_view'):
+                node_view = parent.node_view
+                if hasattr(node_view, 'node_scene'):
+                    scene = node_view.node_scene
+                    if hasattr(scene, '_create_node_item_for_block'):
+                        scene._create_node_item_for_block(block)
+                        break
+            parent = parent.parent()
