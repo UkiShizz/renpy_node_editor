@@ -348,8 +348,20 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                 next_blocks_with_dist = connections_map.get(current_id, [])
                 
                 if len(next_blocks_with_dist) > 1:
-                    # Это разветвление - обрабатываем его рекурсивно
-                    process_block_dfs(current_id)
+                    # Это разветвление - обрабатываем все параллельные ветки полностью
+                    # Сортируем по позиции (сверху вниз, слева направо)
+                    next_blocks_sorted = sorted(
+                        next_blocks_with_dist,
+                        key=lambda x: (
+                            next((b.y for b in scene.blocks if b.id == x[0]), 0),
+                            next((b.x for b in scene.blocks if b.id == x[0]), 0)
+                        )
+                    )
+                    
+                    # Обрабатываем каждую параллельную ветку полностью до точки слияния
+                    for next_id, _ in next_blocks_sorted:
+                        if next_id not in visited:
+                            process_chain_dfs(next_id)
                     break
                 elif len(next_blocks_with_dist) == 1:
                     # Один выход - продолжаем цепочку
