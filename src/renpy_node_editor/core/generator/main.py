@@ -587,13 +587,15 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                 if block.type == BlockType.START:
                     from renpy_node_editor.core.generator.blocks import safe_get_str
                     start_label = safe_get_str(block.params, "label", "") or safe_get_str(block.params, "Имя метки (label):", "")
-                    # Проверяем, не была ли эта метка уже сгенерирована
-                    if start_label and start_label not in generated_labels:
+                    # Генерируем label всегда, если он есть (даже если уже был сгенерирован в другой сцене)
+                    if start_label:
                         print(f"DEBUG: Генерация START блока {block.id} с label '{start_label}' (блок без соединений)")
                         code = generate_block(block, "", char_name_map, project_scenes, generated_labels, all_possible_labels)
                         if code:
                             lines.append(code)
-                            generated_labels.add(start_label)
+                            # Добавляем в generated_labels только если еще не было
+                            if start_label not in generated_labels:
+                                generated_labels.add(start_label)
                 else:
                     print(f"DEBUG: Генерация блока {block.id} типа {block.type} (блок без соединений)")
                     code = generate_block(block, INDENT, char_name_map, project_scenes, generated_labels, all_possible_labels)
