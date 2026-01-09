@@ -544,7 +544,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                     chain_code = generate_block_chain(
                         scene, next_id, connections_map, visited_for_chain, INDENT, 
                         char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
-                        generated_labels=generated_labels
+                        generated_labels=generated_labels, all_possible_labels=all_possible_labels
                     )
                     if chain_code:
                         lines.append(chain_code)
@@ -567,12 +567,20 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                 continue
             
             # Генерируем блок с отступом
-            code = generate_block(block, INDENT, char_name_map, project_scenes, generated_labels)
+            code = generate_block(block, INDENT, char_name_map, project_scenes, generated_labels, all_possible_labels)
             if code:
                 lines.append(code)
             visited.add(block_id)
         
         # Обрабатываем блоки без соединений
+        print(f"DEBUG: Обработка блоков без соединений в сцене {scene.name}")
+        print(f"  Всего блоков в сцене: {len(scene.blocks)}")
+        print(f"  Обработано блоков (visited): {len(visited)}")
+        unvisited_blocks = [b for b in scene.blocks if b.id not in visited and b.type not in (BlockType.IMAGE, BlockType.CHARACTER)]
+        print(f"  Необработанных блоков (кроме IMAGE/CHARACTER): {len(unvisited_blocks)}")
+        for block in unvisited_blocks:
+            print(f"    Блок {block.id} типа {block.type}")
+        
         for block in scene.blocks:
             if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
                 # START блоки генерируются на верхнем уровне (без отступа)
@@ -581,15 +589,18 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                     start_label = safe_get_str(block.params, "label", "") or safe_get_str(block.params, "Имя метки (label):", "")
                     # Проверяем, не была ли эта метка уже сгенерирована
                     if start_label and start_label not in generated_labels:
+                        print(f"DEBUG: Генерация START блока {block.id} с label '{start_label}' (блок без соединений)")
                         code = generate_block(block, "", char_name_map, project_scenes, generated_labels, all_possible_labels)
                         if code:
                             lines.append(code)
                             generated_labels.add(start_label)
                 else:
+                    print(f"DEBUG: Генерация блока {block.id} типа {block.type} (блок без соединений)")
                     code = generate_block(block, INDENT, char_name_map, project_scenes, generated_labels, all_possible_labels)
                     if code:
                         lines.append(code)
     
+    print(f"DEBUG: Итого сгенерировано строк для сцены {scene.name}: {len(lines)}")
     lines.append("\n")
     return "".join(lines)
 
