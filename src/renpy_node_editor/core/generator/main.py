@@ -279,41 +279,37 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if code:
                 lines.append(code)
     else:
-        # Используем топологическую сортировку с правильной обработкой параллельных веток
-        from renpy_node_editor.core.generator.utils import topological_sort_blocks
+        # Сначала нумеруем все блоки в порядке обработки с учетом параллельности
+        # block_order: block_id -> (level, sublevel) где level - основной уровень, sublevel - для параллельных веток
+        block_order: Dict[str, Tuple[int, float]] = {}
+        visited_for_numbering: Set[str] = set()
+        current_level = 0
         
-        visited: Set[str] = set()
-        
-        def process_block_recursive(block_id: str) -> None:
-            """Обрабатывает блок и все его выходы рекурсивно"""
-            if block_id in visited:
+        def number_blocks_recursive(block_id: str, level: int, sublevel: float = 0.0) -> None:
+            """Нумерует блоки в порядке обработки"""
+            if block_id in visited_for_numbering:
                 return
             
             block = scene.find_block(block_id)
             if not block:
                 return
             
-            # Проверяем, все ли входы блока обработаны (для точек слияния)
+            # Проверяем, все ли входы обработаны (для точек слияния)
             if reverse_connections:
                 input_blocks = reverse_connections.get(block_id, set())
                 if input_blocks:
-                    if not all(inp_id in visited for inp_id in input_blocks):
+                    if not all(inp_id in visited_for_numbering for inp_id in input_blocks):
                         return
             
-            # START блок не генерирует код
-            if block.type != BlockType.START:
-                code = generate_block(block, INDENT, char_name_map)
-                if code:
-                    lines.append(code)
-            
-            visited.add(block_id)
+            # Присваиваем номер
+            block_order[block_id] = (level, sublevel)
+            visited_for_numbering.add(block_id)
             
             # Получаем выходы этого блока
             next_blocks_with_dist = connections_map.get(block_id, [])
             
             if len(next_blocks_with_dist) > 1:
-                # Это разветвление - обрабатываем все параллельные ветки полностью
-                # Сортируем по позиции (сверху вниз, слева направо)
+                # Это разветвление - все параллельные ветки получают одинаковый level, но разные sublevel
                 next_blocks_sorted = sorted(
                     next_blocks_with_dist,
                     key=lambda x: (
@@ -322,46 +318,42 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                     )
                 )
                 
-                # Обрабатываем каждую параллельную ветку полностью до точки слияния
-                for next_id, _ in next_blocks_sorted:
-                    if next_id not in visited:
-                        # Обрабатываем всю цепочку этой ветки до точки слияния
-                        process_chain_until_merge(next_id)
+                # Нумеруем все параллельные ветки полностью до точки слияния
+                for idx, (next_id, _) in enumerate(next_blocks_sorted):
+                    if next_id not in visited_for_numbering:
+                        number_chain_until_merge(next_id, level + 1, float(idx) / 1000.0)
             elif len(next_blocks_with_dist) == 1:
-                # Один выход - продолжаем рекурсивно
+                # Один выход - продолжаем с тем же level
                 next_id = next_blocks_with_dist[0][0]
-                if next_id not in visited:
-                    process_block_recursive(next_id)
+                if next_id not in visited_for_numbering:
+                    number_blocks_recursive(next_id, level, sublevel)
         
-        def process_chain_until_merge(block_id: str) -> None:
-            """Обрабатывает цепочку блоков до точки слияния или разветвления"""
+        def number_chain_until_merge(block_id: str, level: int, sublevel: float) -> None:
+            """Нумерует цепочку блоков до точки слияния или разветвления"""
             current_id = block_id
+            current_sublevel = sublevel
             
-            while current_id and current_id not in visited:
-                # Проверяем, все ли входы блока обработаны (для точек слияния)
+            while current_id and current_id not in visited_for_numbering:
+                # Проверяем, все ли входы обработаны (для точек слияния)
                 if reverse_connections:
                     input_blocks = reverse_connections.get(current_id, set())
                     if input_blocks:
-                        if not all(inp_id in visited for inp_id in input_blocks):
+                        if not all(inp_id in visited_for_numbering for inp_id in input_blocks):
                             return
                 
                 block = scene.find_block(current_id)
                 if not block:
                     break
                 
-                # START блок не генерирует код
-                if block.type != BlockType.START:
-                    code = generate_block(block, INDENT, char_name_map)
-                    if code:
-                        lines.append(code)
-                
-                visited.add(current_id)
+                # Присваиваем номер
+                block_order[current_id] = (level, current_sublevel)
+                visited_for_numbering.add(current_id)
                 
                 # Получаем выходы этого блока
                 next_blocks_with_dist = connections_map.get(current_id, [])
                 
                 if len(next_blocks_with_dist) > 1:
-                    # Это разветвление - обрабатываем все параллельные ветки полностью
+                    # Это разветвление - обрабатываем все параллельные ветки
                     next_blocks_sorted = sorted(
                         next_blocks_with_dist,
                         key=lambda x: (
@@ -370,9 +362,9 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                         )
                     )
                     
-                    for next_id, _ in next_blocks_sorted:
-                        if next_id not in visited:
-                            process_chain_until_merge(next_id)
+                    for idx, (next_id, _) in enumerate(next_blocks_sorted):
+                        if next_id not in visited_for_numbering:
+                            number_chain_until_merge(next_id, level + 1, float(idx) / 1000.0)
                     break
                 elif len(next_blocks_with_dist) == 1:
                     # Один выход - проверяем, не является ли он точкой слияния
@@ -382,16 +374,17 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                         if len(next_inputs) > 1:
                             # Следующий блок - точка слияния, останавливаемся здесь
                             break
+                    level += 1
                     current_id = next_id
                 else:
                     break
         
-        # Обрабатываем все стартовые блоки
+        # Нумеруем все стартовые блоки
         for start_block in start_blocks:
-            if start_block.id not in visited:
-                process_block_recursive(start_block.id)
+            if start_block.id not in visited_for_numbering:
+                number_blocks_recursive(start_block.id, 0, 0.0)
         
-        # Многопроходная обработка для оставшихся блоков (точки слияния)
+        # Многопроходная нумерация для оставшихся блоков (точки слияния)
         max_iterations = len(scene.blocks) * 3
         for iteration in range(max_iterations):
             progress_made = False
@@ -402,18 +395,53 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             )
             
             for block in blocks_sorted:
-                if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START):
+                if block.id not in visited_for_numbering and block.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START):
                     if reverse_connections:
                         input_blocks = reverse_connections.get(block.id, set())
                         if input_blocks:
-                            if not all(inp_id in visited for inp_id in input_blocks):
+                            if not all(inp_id in visited_for_numbering for inp_id in input_blocks):
                                 continue
                     
-                    process_block_recursive(block.id)
+                    # Находим максимальный level среди входов
+                    max_input_level = 0
+                    if reverse_connections:
+                        input_blocks = reverse_connections.get(block.id, set())
+                        for inp_id in input_blocks:
+                            if inp_id in block_order:
+                                max_input_level = max(max_input_level, block_order[inp_id][0])
+                    
+                    number_blocks_recursive(block.id, max_input_level + 1, 0.0)
                     progress_made = True
             
             if not progress_made:
                 break
+        
+        # Теперь генерируем код в порядке номеров
+        # Сортируем блоки по (level, sublevel)
+        blocks_to_generate = [
+            (block_id, level, sublevel)
+            for block_id, (level, sublevel) in block_order.items()
+        ]
+        blocks_to_generate.sort(key=lambda x: (x[1], x[2]))  # Сортируем по level, затем sublevel
+        
+        visited: Set[str] = set()
+        for block_id, _, _ in blocks_to_generate:
+            if block_id in visited:
+                continue
+            
+            block = scene.find_block(block_id)
+            if not block:
+                continue
+            
+            # START, IMAGE, CHARACTER блоки не генерируются здесь
+            if block.type in (BlockType.START, BlockType.IMAGE, BlockType.CHARACTER):
+                visited.add(block_id)
+                continue
+            
+            code = generate_block(block, INDENT, char_name_map)
+            if code:
+                lines.append(code)
+            visited.add(block_id)
         
         # Обрабатываем блоки без соединений
         for block in scene.blocks:
