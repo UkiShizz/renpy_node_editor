@@ -293,11 +293,22 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
     start_blocks = find_start_blocks(scene, connections_map)
     
     # Отладочный вывод
-    print(f"DEBUG generate_scene: Сцена {scene.name}, START блоков найдено: {len(start_blocks)}")
+    print(f"DEBUG generate_scene: Сцена {scene.name}")
+    print(f"  Всего блоков в сцене: {len(scene.blocks)}")
+    print(f"  START блоков найдено: {len(start_blocks)}")
     for sb in start_blocks:
         from renpy_node_editor.core.generator.blocks import safe_get_str
         label = safe_get_str(sb.params, "label", "") or safe_get_str(sb.params, "Имя метки (label):", "")
-        print(f"  START блок {sb.id}: label='{label}', params={sb.params}")
+        print(f"  START блок {sb.id}: label='{label}', params keys: {list(sb.params.keys())}, params={sb.params}")
+    
+    # Проверяем все блоки типа START в сцене
+    from renpy_node_editor.core.model import BlockType
+    all_start_blocks = [b for b in scene.blocks if b.type == BlockType.START]
+    print(f"  Всего START блоков в сцене (прямой поиск): {len(all_start_blocks)}")
+    for sb in all_start_blocks:
+        from renpy_node_editor.core.generator.blocks import safe_get_str
+        label = safe_get_str(sb.params, "label", "") or safe_get_str(sb.params, "Имя метки (label):", "")
+        print(f"    START блок {sb.id}: label='{label}', params keys: {list(sb.params.keys())}")
     
     # Проверяем, есть ли START блоки с label
     has_start_blocks_with_labels = False
