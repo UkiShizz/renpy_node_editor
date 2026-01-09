@@ -273,10 +273,8 @@ class BlockPropertiesPanel(QWidget):
         elif block_type == BlockType.LABEL:
             self._add_text_field("label", "Имя метки:", "")
         elif block_type == BlockType.START:
-            # Добавляем поле для выбора лейбла из проекта
-            self._add_scene_label_field("target_label", "Переход на метку:", "")
-            # Добавляем выбор типа перехода: jump или call
-            self._add_combo_field("transition_type", "Тип перехода:", ["jump", "call"], "jump")
+            # START блок имеет свой собственный label, чтобы на него могли ссылаться JUMP и CALL
+            self._add_text_field("label", "Имя метки (label):", "")
         elif block_type == BlockType.SCENE:
             # Фон может быть "black", "white" или имя изображения (например, "bg room")
             # Добавляем поле с кнопкой выбора файла

@@ -63,7 +63,7 @@ def normalize_variable_name(name: str) -> str:
 
 def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, str]] = None, project_scenes: Optional[list] = None) -> str:
     """Generate code for a single block"""
-    # START блок генерирует jump/call если указан target_label
+    # START блок генерирует свой собственный label, на который могут ссылаться JUMP и CALL
     if block.type == BlockType.START:
         from renpy_node_editor.core.generator.blocks import generate_start
         return generate_start(block, indent, project_scenes)
@@ -441,13 +441,13 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             if not block:
                 continue
             
-            # START блоки генерируются отдельно (могут иметь jump/call)
+            # START блоки генерируют свой собственный label
             # IMAGE, CHARACTER блоки не генерируются здесь
             if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
                 visited.add(block_id)
                 continue
             
-            # START блоки генерируются, если у них есть target_label
+            # START блоки генерируются, если у них есть label
             if block.type == BlockType.START:
                 code = generate_block(block, INDENT, char_name_map, project_scenes)
                 if code:
