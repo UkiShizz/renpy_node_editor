@@ -162,6 +162,7 @@ def generate_block_chain(
                             Used to detect merge points (blocks that should wait for all inputs).
     """
     if start_block_id in visited:
+        print(f"DEBUG generate_block_chain: Блок {start_block_id} уже в visited, пропускаем")
         return ""  # Prevent cycles
     
     # Проверяем, все ли входы блока обработаны (для точек слияния)
@@ -171,13 +172,16 @@ def generate_block_chain(
             # Проверяем, все ли входные блоки обработаны
             if not all(inp_id in visited for inp_id in input_blocks):
                 # Не все входы обработаны - пропускаем этот блок пока
+                print(f"DEBUG generate_block_chain: Блок {start_block_id} имеет необработанные входы: {input_blocks - visited}")
                 return ""
     
     visited.add(start_block_id)
     block = scene.find_block(start_block_id)
     if not block:
+        print(f"DEBUG generate_block_chain: Блок {start_block_id} не найден в сцене")
         return ""
     
+    print(f"DEBUG generate_block_chain: Обработка блока {start_block_id} типа {block.type}")
     lines: List[str] = []
     
     # Generate code for current block
@@ -245,11 +249,13 @@ def generate_block_chain(
             # Продолжаем цепочку после START блока
         else:
             code = generate_block(block, indent, char_name_map, project_scenes, generated_labels, all_possible_labels)
+            print(f"DEBUG generate_block_chain: Сгенерированный код для блока {start_block_id} типа {block.type}: {repr(code[:100]) if code else 'пусто'}")
             if code:
                 lines.append(code)
         
         # Continue through connections only if recursive mode is enabled
         if recursive:
+            print(f"DEBUG generate_block_chain: Рекурсивный режим включен, обрабатываем связи блока {start_block_id}")
             # Continue through connections (already sorted by distance)
             # Process shorter connections first for parallel branches
             # ВАЖНО: используем то же множество visited, чтобы избежать дублирования
@@ -539,17 +545,24 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             
             # Получаем блоки, связанные с START блоком
             next_blocks_with_dist = connections_map.get(start_block.id, [])
-            for next_id, _ in next_blocks_with_dist:
+            print(f"DEBUG: START блок {start_block.id} имеет {len(next_blocks_with_dist)} связанных блоков")
+            for next_id, dist in next_blocks_with_dist:
+                print(f"  Связанный блок: {next_id}, расстояние: {dist}")
                 if next_id not in visited_for_chain:
+                    print(f"DEBUG: Генерация цепочки для блока {next_id} после START блока {start_block.id}")
                     chain_code = generate_block_chain(
                         scene, next_id, connections_map, visited_for_chain, INDENT, 
                         char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
                         generated_labels=generated_labels, all_possible_labels=all_possible_labels
                     )
+                    print(f"DEBUG: Сгенерированный код цепочки для блока {next_id}: {repr(chain_code[:100]) if chain_code else 'пусто'}")
                     if chain_code:
                         lines.append(chain_code)
+                else:
+                    print(f"DEBUG: Блок {next_id} уже в visited_for_chain, пропускаем")
             
             # Отмечаем все обработанные блоки как visited
+            print(f"DEBUG: Обработано блоков в цепочке после START {start_block.id}: {len(visited_for_chain)}")
             visited.update(visited_for_chain)
         
         # Генерируем оставшиеся блоки (не связанные с START блоками)
