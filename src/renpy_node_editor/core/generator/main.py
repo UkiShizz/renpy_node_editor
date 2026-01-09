@@ -275,11 +275,12 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if code:
                 lines.append(code)
     else:
-        # Простой обход в глубину (DFS) - обрабатываем все параллельные ветки последовательно
+        # Используем простой подход: обрабатываем блоки в порядке их появления в графе
+        # При разветвлении обрабатываем все параллельные ветки полностью до точек слияния
         visited: Set[str] = set()
         
-        def process_block_dfs(block_id: str) -> None:
-            """Рекурсивно обрабатывает блок и все его потомки"""
+        def process_block(block_id: str) -> None:
+            """Обрабатывает один блок"""
             if block_id in visited:
                 return
             
@@ -297,12 +298,20 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             )
             if code:
                 lines.append(code)
+        
+        def process_all_parallel_branches(block_id: str) -> None:
+            """Обрабатывает блок и все его параллельные ветки полностью до точек слияния"""
+            if block_id in visited:
+                return
             
-            # Получаем все выходы этого блока (без сортировки)
+            # Обрабатываем сам блок
+            process_block(block_id)
+            
+            # Получаем все выходы этого блока
             next_blocks_with_dist = connections_map.get(block_id, [])
             
             if len(next_blocks_with_dist) > 1:
-                # Это разветвление - обрабатываем все параллельные ветки последовательно
+                # Это разветвление - обрабатываем все параллельные ветки полностью
                 # Сортируем по позиции (сверху вниз, слева направо)
                 next_blocks_sorted = sorted(
                     next_blocks_with_dist,
@@ -313,17 +322,18 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                 )
                 
                 # Обрабатываем каждую параллельную ветку полностью до точки слияния
+                # ВАЖНО: обрабатываем все ветки последовательно, каждая полностью
                 for next_id, _ in next_blocks_sorted:
                     if next_id not in visited:
-                        # Обрабатываем всю цепочку этой ветки рекурсивно
-                        process_chain_dfs(next_id)
+                        # Обрабатываем всю цепочку этой ветки до точки слияния
+                        process_chain_until_merge(next_id)
             elif len(next_blocks_with_dist) == 1:
                 # Один выход - обрабатываем его рекурсивно
                 next_id = next_blocks_with_dist[0][0]
                 if next_id not in visited:
-                    process_block_dfs(next_id)
+                    process_all_parallel_branches(next_id)
         
-        def process_chain_dfs(block_id: str) -> None:
+        def process_chain_until_merge(block_id: str) -> None:
             """Обрабатывает цепочку блоков до точки слияния или разветвления"""
             current_id = block_id
             
@@ -334,15 +344,11 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                     if len(input_blocks) > 1:
                         # Это точка слияния - проверяем, все ли входы обработаны
                         if not all(inp_id in visited for inp_id in input_blocks):
-                            # Не все входы обработаны - останавливаемся
-                            break
+                            # Не все входы обработаны - останавливаемся, не обрабатываем этот блок
+                            return
                 
-                # Генерируем код для этого блока
-                code = generate_block_chain(
-                    scene, current_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
-                )
-                if code:
-                    lines.append(code)
+                # Обрабатываем блок
+                process_block(current_id)
                 
                 # Получаем выходы этого блока
                 next_blocks_with_dist = connections_map.get(current_id, [])
@@ -359,11 +365,11 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                     )
                     
                     # Обрабатываем каждую параллельную ветку полностью до точки слияния
-                    # Важно: обрабатываем все ветки последовательно, каждая полностью
+                    # ВАЖНО: обрабатываем все ветки последовательно, каждая полностью
                     for next_id, _ in next_blocks_sorted:
                         if next_id not in visited:
                             # Обрабатываем всю цепочку этой ветки до точки слияния
-                            process_chain_dfs(next_id)
+                            process_chain_until_merge(next_id)
                     # После обработки всех параллельных веток, выходим из цикла
                     break
                 elif len(next_blocks_with_dist) == 1:
@@ -376,10 +382,9 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
         # Обрабатываем все стартовые блоки
         for start_block in start_blocks:
             if start_block.id not in visited:
-                process_block_dfs(start_block.id)
+                process_all_parallel_branches(start_block.id)
         
         # Многопроходная обработка для оставшихся блоков (точки слияния)
-        # Обрабатываем блоки, пока есть что обрабатывать
         max_iterations = len(scene.blocks) * 3
         for iteration in range(max_iterations):
             progress_made = False
@@ -399,8 +404,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                             if not all(inp_id in visited for inp_id in input_blocks):
                                 continue
                     
-                    # Все входы обработаны - обрабатываем блок
-                    process_block_dfs(block.id)
+                    # Все входы обработаны - обрабатываем блок и его ветки
+                    process_all_parallel_branches(block.id)
                     progress_made = True
             
             if not progress_made:
