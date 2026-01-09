@@ -171,4 +171,32 @@ class Project:
         self.scenes.append(scene)
     
     def remove_scene(self, scene_id: str) -> None:
+        """Удалить сцену из проекта"""
+        original_count = len(self.scenes)
         self.scenes = [s for s in self.scenes if s.id != scene_id]
+        # Проверяем, что сцена действительно удалена
+        if len(self.scenes) == original_count:
+            # Сцена не была найдена - возможно ID не совпадает
+            # Пробуем найти по имени или другим способом
+            pass
+    def move_scene_up(self, scene_id: str) -> bool:
+        """Переместить сцену вверх в списке (раньше в порядке генерации)"""
+        for i, scene in enumerate(self.scenes):
+            if scene.id == scene_id:
+                if i > 0:
+                    # Меняем местами с предыдущей сценой
+                    self.scenes[i], self.scenes[i - 1] = self.scenes[i - 1], self.scenes[i]
+                    return True
+                return False
+        return False
+    
+    def move_scene_down(self, scene_id: str) -> bool:
+        """Переместить сцену вниз в списке (позже в порядке генерации)"""
+        for i, scene in enumerate(self.scenes):
+            if scene.id == scene_id:
+                if i < len(self.scenes) - 1:
+                    # Меняем местами со следующей сценой
+                    self.scenes[i], self.scenes[i + 1] = self.scenes[i + 1], self.scenes[i]
+                    return True
+                return False
+        return False

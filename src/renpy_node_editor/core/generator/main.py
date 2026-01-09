@@ -655,7 +655,8 @@ def generate_renpy_script(project: Project) -> str:
         lines.append("label start:\n")
         lines.append("    return\n\n")
     
-    # Generate scenes
+    # Generate scenes in the same order as they appear in the scenes list
+    # Порядок генерации соответствует порядку сцен в списке
     for scene in project.scenes:
         lines.append(generate_scene(scene, char_name_map, project.scenes))
     

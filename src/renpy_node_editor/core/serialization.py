@@ -61,10 +61,14 @@ def _scene_to_dict(scene: Scene) -> Dict[str, Any]:
 
 
 def project_to_dict(project: Project) -> Dict[str, Any]:
+    """
+    Сохранить проект в словарь.
+    Порядок сцен сохраняется (JSON сохраняет порядок списков).
+    """
     return {
         "name": project.name,
         "variables": project.variables,
-        "scenes": [_scene_to_dict(s) for s in project.scenes],
+        "scenes": [_scene_to_dict(s) for s in project.scenes],  # Порядок сохраняется
     }
 
 
@@ -118,7 +122,11 @@ def _scene_from_dict(payload: Dict[str, Any]) -> Scene:
 
 
 def project_from_dict(payload: Dict[str, Any]) -> Project:
-    scenes = [_scene_from_dict(s) for s in payload.get("scenes", [])]
+    """
+    Загрузить проект из словаря.
+    Порядок сцен сохраняется из JSON (списки в JSON сохраняют порядок).
+    """
+    scenes = [_scene_from_dict(s) for s in payload.get("scenes", [])]  # Порядок сохраняется
     return Project(
         name=payload.get("name", "Unnamed"),
         scenes=scenes,

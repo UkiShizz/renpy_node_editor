@@ -223,9 +223,11 @@ class BlockPropertiesPanel(QWidget):
             self._add_text_field("variable", "Переменная:", "i")
             self._add_text_field("iterable", "Итерируемый объект:", "[1, 2, 3]")
         elif block_type == BlockType.JUMP:
-            self._add_text_field("target", "Переход на метку:", "")
+            # Используем выпадающий список с метками всех сцен (актов) проекта
+            self._add_scene_label_field("target", "Переход на метку (акт):", "")
         elif block_type == BlockType.CALL:
-            self._add_text_field("label", "Вызов метки:", "")
+            # Используем выпадающий список с метками всех сцен (актов) проекта
+            self._add_scene_label_field("label", "Вызов метки (акт):", "")
         elif block_type == BlockType.PAUSE:
             self._add_text_field("duration", "Длительность (сек):", "1.0")
         elif block_type == BlockType.TRANSITION:
@@ -824,15 +826,25 @@ class BlockPropertiesPanel(QWidget):
         return None
     
     def _get_scene_labels(self) -> list[str]:
-        """Получить список лейблов из всех сцен проекта"""
+        """Получить список лейблов из всех сцен проекта (включая метки сцен и START блоков)"""
         project = self._get_project()
         if not project:
             return []
         
         labels = []
+        # Добавляем метки сцен (актов)
         for scene in project.scenes:
             if scene.label and scene.label not in labels:
                 labels.append(scene.label)
+        
+        # Добавляем метки из START блоков всех сцен
+        from renpy_node_editor.core.model import BlockType
+        for scene in project.scenes:
+            for block in scene.blocks:
+                if block.type == BlockType.START:
+                    start_label = block.params.get("label", "")
+                    if start_label and start_label not in labels:
+                        labels.append(start_label)
         
         return sorted(labels)
     

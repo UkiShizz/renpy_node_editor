@@ -107,6 +107,19 @@ class SceneManagerPanel(QWidget):
         btn_delete.clicked.connect(self._on_delete_scene)
         buttons_layout.addWidget(btn_delete)
         
+        # Кнопки для изменения порядка сцен
+        btn_up = QPushButton("⬆️", self)
+        btn_up.setToolTip("Переместить сцену вверх (раньше в порядке генерации)")
+        btn_up.setMaximumWidth(40)
+        btn_up.clicked.connect(self._on_move_scene_up)
+        buttons_layout.addWidget(btn_up)
+        
+        btn_down = QPushButton("⬇️", self)
+        btn_down.setToolTip("Переместить сцену вниз (позже в порядке генерации)")
+        btn_down.setMaximumWidth(40)
+        btn_down.clicked.connect(self._on_move_scene_down)
+        buttons_layout.addWidget(btn_down)
+        
         layout.addLayout(buttons_layout)
         
         # Список сцен
@@ -151,6 +164,9 @@ class SceneManagerPanel(QWidget):
                     item.setForeground(QColor("#4A90E2"))
                 
                 self.scenes_list.addItem(item)
+            
+            # Принудительно обновляем виджет
+            self.scenes_list.update()
         finally:
             self.scenes_list.blockSignals(False)
     
@@ -241,15 +257,63 @@ class SceneManagerPanel(QWidget):
                 )
                 return
             
+            # Сохраняем ID удаляемой сцены
+            deleted_scene_id = scene_id
+            
+            # Удаляем сцену из проекта
             self._project.remove_scene(scene_id)
-            self._refresh_scenes_list()
+            
+            # Проверяем, что сцена действительно удалена
+            if self._project.find_scene(scene_id):
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    "Не удалось удалить сцену."
+                )
+                return
+            
+            # Если удаляемая сцена была текущей, сбрасываем текущую сцену
+            if self._current_scene and self._current_scene.id == deleted_scene_id:
+                self._current_scene = None
+            
+            # Обновляем список сцен
+            # Сначала полностью очищаем список
+            self.scenes_list.clear()
+            
+            # Затем заполняем заново
+            if self._project:
+                for scene in self._project.scenes:
+                    item_text = f"{scene.name}\n  ({scene.label})"
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.UserRole, scene.id)
+                    self.scenes_list.addItem(item)
+            
+            # Принудительно обновляем виджет
+            self.scenes_list.repaint()
+            self.scenes_list.update()
+            self.update()
             
             # Выбираем первую доступную сцену
             if self._project.scenes:
                 new_scene = self._project.scenes[0]
                 # Обновляем текущую сцену перед эмиссией сигнала
                 self._current_scene = new_scene
+                # Блокируем сигналы при программном обновлении
+                self._is_updating_selection = True
+                try:
+                    # Выделяем новую сцену в списке
+                    for i in range(self.scenes_list.count()):
+                        item = self.scenes_list.item(i)
+                        if item and item.data(Qt.UserRole) == new_scene.id:
+                            self.scenes_list.setCurrentItem(item)
+                            item.setSelected(True)
+                            break
+                finally:
+                    self._is_updating_selection = False
                 self.scene_selected.emit(new_scene)
+            else:
+                # Если сцен не осталось, сбрасываем текущую сцену
+                self._current_scene = None
     
     def _on_scene_double_clicked(self, item: QListWidgetItem) -> None:
         """Обработка двойного клика по сцене"""
@@ -263,6 +327,46 @@ class SceneManagerPanel(QWidget):
             if self._current_scene and self._current_scene.id == scene.id:
                 return
             self.scene_selected.emit(scene)
+    
+    def _on_move_scene_up(self) -> None:
+        """Переместить выбранную сцену вверх"""
+        if not self._project:
+            return
+        
+        current_item = self.scenes_list.currentItem()
+        if not current_item:
+            return
+        
+        scene_id = current_item.data(Qt.UserRole)
+        if self._project.move_scene_up(scene_id):
+            # Обновляем список сцен
+            self._refresh_scenes_list()
+            # Выделяем перемещенную сцену
+            for i in range(self.scenes_list.count()):
+                item = self.scenes_list.item(i)
+                if item and item.data(Qt.UserRole) == scene_id:
+                    self.scenes_list.setCurrentItem(item)
+                    break
+    
+    def _on_move_scene_down(self) -> None:
+        """Переместить выбранную сцену вниз"""
+        if not self._project:
+            return
+        
+        current_item = self.scenes_list.currentItem()
+        if not current_item:
+            return
+        
+        scene_id = current_item.data(Qt.UserRole)
+        if self._project.move_scene_down(scene_id):
+            # Обновляем список сцен
+            self._refresh_scenes_list()
+            # Выделяем перемещенную сцену
+            for i in range(self.scenes_list.count()):
+                item = self.scenes_list.item(i)
+                if item and item.data(Qt.UserRole) == scene_id:
+                    self.scenes_list.setCurrentItem(item)
+                    break
     
     def _on_scene_selection_changed(self) -> None:
         """Обработка изменения выбора сцены"""
