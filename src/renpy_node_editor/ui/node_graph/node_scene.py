@@ -206,11 +206,9 @@ class NodeScene(QGraphicsScene):
             # ВАЖНО: создаем связи ПОСЛЕ установки _is_loading = False
             # Это нужно, чтобы _create_connections() не выходил сразу из-за проверки _is_loading
             try:
-                print(f"DEBUG: Вызов _create_connections. _is_loading={self._is_loading}, _scene_model={self._scene_model is not None}")
                 self._create_connections()
             except Exception as e:
                 import traceback
-                print(f"DEBUG: Ошибка в _create_connections: {e}")
                 traceback.print_exc()
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
@@ -293,19 +291,10 @@ class NodeScene(QGraphicsScene):
     
     def _create_connections(self) -> None:
         """Создать визуальные связи из модели"""
-        print(f"DEBUG: _create_connections вызван. _scene_model={self._scene_model is not None}, _is_loading={self._is_loading}")
         if not self._scene_model:
-            print("DEBUG: _create_connections: _scene_model is None, выходим")
             return
         if self._is_loading:
-            print("DEBUG: _create_connections: _is_loading is True, выходим")
             return
-        
-        # Отладочный вывод
-        print(f"DEBUG: _create_connections вызван. Connections в модели: {len(self._scene_model.connections)}")
-        print(f"DEBUG: Ports в модели: {len(self._scene_model.ports)}")
-        for port in self._scene_model.ports:
-            print(f"  Port: id={port.id}, node_id={port.node_id}, name={port.name}, direction={port.direction}")
         
         # Создаем маппинг port_id -> PortItem
         # Сначала создаем маппинг по сохраненным портам из модели
@@ -358,10 +347,6 @@ class NodeScene(QGraphicsScene):
                             if port_item:
                                 # Нашли соответствие - сохраняем маппинг по ID из модели
                                 port_items[model_port.id] = port_item
-                                print(f"DEBUG: Сопоставлен порт {model_port.id} (node_id={model_port.node_id}, name={model_port.name}) с PortItem")
-                            else:
-                                # Порт есть в модели, но визуальный PortItem не найден
-                                print(f"DEBUG: Порт {model_port.id} (node_id={model_port.node_id}, name={model_port.name}) есть в модели, но PortItem не найден")
                         
                         # Также проверяем порты, которые могут быть не в port_ids (для обратной совместимости)
                         for model_port in self._scene_model.ports:
@@ -380,16 +365,10 @@ class NodeScene(QGraphicsScene):
                             if port_item:
                                 # Нашли соответствие - сохраняем маппинг по ID из модели
                                 port_items[model_port.id] = port_item
-                                print(f"DEBUG: Сопоставлен порт {model_port.id} (node_id={model_port.node_id}, name={model_port.name}) с PortItem (без port_ids)")
                     except (RuntimeError, AttributeError):
                         continue
             
-            # Отладочный вывод о найденных портах
-            print(f"DEBUG: Найдено портов в маппинге: {len(port_items)}")
-            print(f"DEBUG: Port IDs в маппинге: {list(port_items.keys())}")
-            
             # Теперь создаем связи, используя правильные port_id из модели
-            print(f"DEBUG: Обработка {len(self._scene_model.connections)} connections")
             for conn in self._scene_model.connections:
                 try:
                     src_port_item = port_items.get(conn.from_port_id)
@@ -425,9 +404,7 @@ class NodeScene(QGraphicsScene):
                             missing_ports.append(f"from_port_id={conn.from_port_id}")
                         if not dst_port_item:
                             missing_ports.append(f"to_port_id={conn.to_port_id}")
-                        if missing_ports:
-                            print(f"Connection {conn.id} не может быть восстановлена: не найдены порты {', '.join(missing_ports)}")
-                            print(f"Доступные port_ids в маппинге: {list(port_items.keys())[:10]}...")  # Первые 10 для отладки
+                        # Пропускаем соединение, если порты не найдены
                 except (AttributeError, RuntimeError) as e:
                     print(f"Ошибка при обработке connection {conn.id}: {e}")
                     continue
@@ -655,9 +632,6 @@ class NodeScene(QGraphicsScene):
                     # Это гарантирует, что _scene_model всегда указывает на объект из project.scenes
                     self._scene_model = scene_in_project
                     self._drag_connection.connection_id = connection_id
-                    
-                    # Отладочный вывод для проверки
-                    print(f"DEBUG: Connection добавлен. Scene ID: {scene_in_project.id}, Connection ID: {connection_id}, Connections count: {len(scene_in_project.connections)}")
                 
                 self._drag_connection.set_dst_port(item)
                 self._drag_src_port.add_connection(self._drag_connection)

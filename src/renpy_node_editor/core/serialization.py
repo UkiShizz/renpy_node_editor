@@ -50,11 +50,6 @@ def _connection_to_dict(conn: Connection) -> Dict[str, Any]:
 
 
 def _scene_to_dict(scene: Scene) -> Dict[str, Any]:
-    # Отладочный вывод для проверки сохранения connections
-    print(f"DEBUG: Сохранение сцены {scene.id}. Connections count: {len(scene.connections)}")
-    for conn in scene.connections:
-        print(f"  Connection: {conn.id}, from: {conn.from_port_id}, to: {conn.to_port_id}")
-    
     return {
         "id": scene.id,
         "name": scene.name,
@@ -124,17 +119,6 @@ def _scene_from_dict(payload: Dict[str, Any]) -> Scene:
         if block and port.id not in block.port_ids:
             block.port_ids.append(port.id)
     
-    # Отладочный вывод для проверки загрузки connections
-    print(f"DEBUG: Загрузка сцены {payload.get('id', 'unknown')}. Connections в JSON: {len(payload.get('connections', []))}, загружено: {len(connections)}")
-    for conn in connections:
-        print(f"  Connection: {conn.id}, from: {conn.from_port_id}, to: {conn.to_port_id}")
-    
-    print(f"DEBUG: Портов загружено: {len(ports)}")
-    for port in ports:
-        block = block_map.get(port.node_id)
-        if block:
-            print(f"  Port: {port.id}, node_id={port.node_id}, name={port.name}, в block.port_ids: {port.id in block.port_ids}")
-
     return Scene(
         id=payload["id"],
         name=payload.get("name", ""),
