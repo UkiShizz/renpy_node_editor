@@ -90,14 +90,29 @@ class PortItem(QGraphicsEllipseItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemScenePositionHasChanged:
-            # Создаем копию списка, чтобы избежать проблем при удалении
-            for c in list(self.connections):
-                try:
-                    c.update_path()
-                except (RuntimeError, AttributeError):
-                    # Связь уже удалена, удаляем из списка
-                    if c in self.connections:
-                        self.connections.remove(c)
+            try:
+                # Проверяем, что порт еще в сцене
+                scene = self.scene()
+                if not scene:
+                    return super().itemChange(change, value)
+                
+                # Проверяем, что сцена не загружается (предотвращаем обновления во время смены сцены)
+                if hasattr(scene, '_is_loading') and scene._is_loading:
+                    return super().itemChange(change, value)
+                
+                # Создаем копию списка, чтобы избежать проблем при удалении
+                for c in list(self.connections):
+                    try:
+                        # Проверяем, что соединение еще существует и в сцене
+                        if c and c.scene():
+                            c.update_path()
+                    except (RuntimeError, AttributeError):
+                        # Связь уже удалена, удаляем из списка
+                        if c in self.connections:
+                            self.connections.remove(c)
+            except Exception:
+                # Игнорируем ошибки
+                pass
         return super().itemChange(change, value)
 
     # ---- visual details ----

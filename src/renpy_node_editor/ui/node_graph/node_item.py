@@ -205,7 +205,12 @@ class NodeItem(QGraphicsRectItem):
             # обновляем все провода при движении ноды
             try:
                 # Проверяем, что элемент еще в сцене
-                if not self.scene():
+                scene = self.scene()
+                if not scene:
+                    return super().itemChange(change, value)
+                
+                # Проверяем, что сцена не загружается (предотвращаем обновления во время смены сцены)
+                if hasattr(scene, '_is_loading') and scene._is_loading:
                     return super().itemChange(change, value)
                 
                 for p in self.inputs + self.outputs:
@@ -213,7 +218,7 @@ class NodeItem(QGraphicsRectItem):
                     for c in list(p.connections):
                         try:
                             # Проверяем, что соединение еще в сцене
-                            if c.scene():
+                            if c and c.scene():
                                 c.update_path()
                         except (RuntimeError, AttributeError):
                             # Соединение уже удалено, удаляем из списка
@@ -237,11 +242,23 @@ class NodeItem(QGraphicsRectItem):
         """Update the displayed content based on block properties"""
         # Remove old content item if it exists
         if self._content_item is not None:
-            scene = self.scene()
-            if scene is not None:
-                scene.removeItem(self._content_item)
-            else:
-                self._content_item.setParentItem(None)
+            try:
+                scene = self.scene()
+                if scene is not None:
+                    # Проверяем, что сцена не загружается
+                    if hasattr(scene, '_is_loading') and scene._is_loading:
+                        return
+                    try:
+                        scene.removeItem(self._content_item)
+                    except (RuntimeError, AttributeError):
+                        pass
+                else:
+                    try:
+                        self._content_item.setParentItem(None)
+                    except (RuntimeError, AttributeError):
+                        pass
+            except (RuntimeError, AttributeError):
+                pass
             self._content_item = None
         
         # Get a preview text based on block type and params

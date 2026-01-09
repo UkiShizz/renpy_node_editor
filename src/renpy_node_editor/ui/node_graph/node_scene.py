@@ -93,55 +93,43 @@ class NodeScene(QGraphicsScene):
                 # Сначала получаем список всех элементов
                 items = list(self.items())
                 
-                # Отключаем все соединения из портов перед удалением
+                # Отключаем геометрические обновления для всех элементов перед удалением
                 for item in items:
                     if isinstance(item, NodeItem):
                         try:
+                            # Отключаем флаги, которые вызывают itemChange
+                            item.setFlag(QGraphicsItem.ItemSendsGeometryChanges, False)
                             # Отключаем обновление позиции для всех портов
                             for port in item.inputs + item.outputs:
-                                if port and hasattr(port, 'connections'):
-                                    # Создаем копию списка для безопасного удаления
-                                    connections_copy = list(port.connections) if port.connections else []
-                                    for conn in connections_copy:
+                                if port:
+                                    try:
+                                        port.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, False)
+                                    except Exception:
+                                        pass
+                                    if hasattr(port, 'connections'):
+                                        # Очищаем список соединений без вызова методов обновления
                                         try:
-                                            port.remove_connection(conn)
+                                            port.connections.clear()
                                         except Exception:
                                             pass
                         except Exception:
                             pass
                 
-                # Удаляем ConnectionItem
-                for item in items:
-                    if isinstance(item, ConnectionItem):
-                        try:
-                            if item.scene() == self:
-                                # Отключаем от портов перед удалением
-                                if hasattr(item, 'src_port') and item.src_port:
-                                    try:
-                                        if item in item.src_port.connections:
-                                            item.src_port.remove_connection(item)
-                                    except Exception:
-                                        pass
-                                if hasattr(item, 'dst_port') and item.dst_port:
-                                    try:
-                                        if item in item.dst_port.connections:
-                                            item.dst_port.remove_connection(item)
-                                    except Exception:
-                                        pass
-                                self.removeItem(item)
-                        except (RuntimeError, AttributeError):
-                            pass
-                
-                # Затем удаляем NodeItem (порты удалятся автоматически)
-                for item in items:
-                    if isinstance(item, NodeItem):
-                        try:
-                            if item.scene() == self:
-                                self.removeItem(item)
-                        except (RuntimeError, AttributeError):
-                            pass
+                # Используем clear() для полной очистки - это безопаснее, чем ручное удаление
+                # clear() удаляет все элементы сразу и предотвращает каскадные обновления
+                self.clear()
             except Exception:
-                pass
+                # Если clear() не сработал, пытаемся удалить вручную
+                try:
+                    items = list(self.items())
+                    for item in items:
+                        try:
+                            if item.scene() == self:
+                                self.removeItem(item)
+                        except (RuntimeError, AttributeError):
+                            pass
+                except Exception:
+                    pass
             
             # Устанавливаем новую модель
             self._project = project
@@ -156,7 +144,16 @@ class NodeScene(QGraphicsScene):
             # Создаем блоки
             for block in scene.blocks:
                 try:
-                    self._create_node_item_for_block(block)
+                    node_item = self._create_node_item_for_block(block)
+                    # Включаем обратно флаги для новых элементов
+                    if node_item:
+                        node_item.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+                        for port in node_item.inputs + node_item.outputs:
+                            if port:
+                                try:
+                                    port.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
+                                except Exception:
+                                    pass
                 except Exception:
                     continue
             
@@ -200,52 +197,70 @@ class NodeScene(QGraphicsScene):
     
     def _create_connections(self) -> None:
         """Создать визуальные связи из модели"""
-        if not self._scene_model:
+        if not self._scene_model or self._is_loading:
             return
         
         # Создаем маппинг port_id -> PortItem
         port_items: dict[str, PortItem] = {}
         try:
-            for item in self.items():
+            items = list(self.items())
+            for item in items:
                 if isinstance(item, NodeItem):
-                    # Проверяем, что блок еще существует в модели
-                    if not self._scene_model.find_block(item.block.id):
-                        continue
-                    
-                    for port in item.inputs + item.outputs:
-                        # Проверяем, что порт еще существует
-                        if not port or not port.scene():
+                    try:
+                        # Проверяем, что элемент еще в сцене
+                        if not item.scene() or not item.block:
+                            continue
+                        # Проверяем, что блок еще существует в модели
+                        if not self._scene_model.find_block(item.block.id):
                             continue
                         
-                        # Нужно найти port_id для этого порта
-                        # Для этого создадим порты в модели если их нет
-                        try:
-                            port_id = self._get_or_create_port_id(item.block, port)
-                            port_items[port_id] = port
-                        except Exception:
-                            continue
+                        for port in item.inputs + item.outputs:
+                            # Проверяем, что порт еще существует
+                            if not port:
+                                continue
+                            try:
+                                if not port.scene():
+                                    continue
+                            except (RuntimeError, AttributeError):
+                                continue
+                            
+                            # Нужно найти port_id для этого порта
+                            # Для этого создадим порты в модели если их нет
+                            try:
+                                port_id = self._get_or_create_port_id(item.block, port)
+                                port_items[port_id] = port
+                            except Exception:
+                                continue
+                    except (RuntimeError, AttributeError):
+                        continue
             
             # Создаем связи
             for conn in self._scene_model.connections:
-                src_port_item = port_items.get(conn.from_port_id)
-                dst_port_item = port_items.get(conn.to_port_id)
-                
-                if src_port_item and dst_port_item:
-                    # Проверяем, что порты еще в сцене
-                    if not src_port_item.scene() or not dst_port_item.scene():
-                        continue
+                try:
+                    src_port_item = port_items.get(conn.from_port_id)
+                    dst_port_item = port_items.get(conn.to_port_id)
                     
-                    try:
-                        connection_item = ConnectionItem(
-                            src_port=src_port_item,
-                            dst_port=dst_port_item,
-                            connection_id=conn.id
-                        )
-                        self.addItem(connection_item)
-                        src_port_item.add_connection(connection_item)
-                        dst_port_item.add_connection(connection_item)
-                    except Exception:
-                        continue
+                    if src_port_item and dst_port_item:
+                        # Проверяем, что порты еще в сцене
+                        try:
+                            if not src_port_item.scene() or not dst_port_item.scene():
+                                continue
+                        except (RuntimeError, AttributeError):
+                            continue
+                        
+                        try:
+                            connection_item = ConnectionItem(
+                                src_port=src_port_item,
+                                dst_port=dst_port_item,
+                                connection_id=conn.id
+                            )
+                            self.addItem(connection_item)
+                            src_port_item.add_connection(connection_item)
+                            dst_port_item.add_connection(connection_item)
+                        except Exception:
+                            continue
+                except (AttributeError, RuntimeError):
+                    continue
         except Exception:
             pass
     
