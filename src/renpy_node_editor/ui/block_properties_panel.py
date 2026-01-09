@@ -831,11 +831,13 @@ class BlockPropertiesPanel(QWidget):
         if not project:
             return []
         
-        labels = []
+        # Используем set для автоматического удаления дубликатов
+        labels_set = set()
+        
         # Добавляем метки сцен (актов)
         for scene in project.scenes:
-            if scene.label and scene.label not in labels:
-                labels.append(scene.label)
+            if scene.label:
+                labels_set.add(scene.label)
         
         # Добавляем метки из START блоков всех сцен
         from renpy_node_editor.core.model import BlockType
@@ -843,10 +845,11 @@ class BlockPropertiesPanel(QWidget):
             for block in scene.blocks:
                 if block.type == BlockType.START:
                     start_label = block.params.get("label", "")
-                    if start_label and start_label not in labels:
-                        labels.append(start_label)
+                    if start_label:
+                        labels_set.add(start_label)
         
-        return sorted(labels)
+        # Возвращаем отсортированный список без дубликатов
+        return sorted(labels_set)
     
     def _add_scene_label_field(self, key: str, label: str, default: str = "") -> None:
         """Add a scene label field with combo box showing all scene labels from project"""
@@ -860,10 +863,9 @@ class BlockPropertiesPanel(QWidget):
         combo.setEditable(True)  # Разрешаем ввод произвольного лейбла
         combo.addItem("")  # Пустой вариант
         
-        # Добавляем лейблы из всех сцен проекта
+        # Добавляем лейблы из всех сцен проекта (без разделителя, чтобы избежать путаницы)
         scene_labels = self._get_scene_labels()
         if scene_labels:
-            combo.addItem("--- Лейблы из проекта ---")
             for label_name in scene_labels:
                 combo.addItem(label_name)
         
