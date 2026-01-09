@@ -243,31 +243,32 @@ class NodeScene(QGraphicsScene):
                             continue
                         
                         # Ищем порты из модели для этого блока
+                        # Сначала создаем маппинг всех портов блока по имени и направлению
+                        block_port_map: dict[tuple[str, bool], PortItem] = {}
+                        for port_item in item.inputs + item.outputs:
+                            if not port_item:
+                                continue
+                            try:
+                                if not port_item.scene():
+                                    continue
+                            except (RuntimeError, AttributeError):
+                                continue
+                            # Ключ: (имя, is_output)
+                            block_port_map[(port_item.name, port_item.is_output)] = port_item
+                        
+                        # Теперь сопоставляем порты из модели с визуальными портами
                         for model_port in self._scene_model.ports:
                             if model_port.node_id != block.id:
                                 continue
                             
-                            # Ищем соответствующий PortItem по имени и направлению
-                            for port_item in item.inputs + item.outputs:
-                                if not port_item:
-                                    continue
-                                try:
-                                    if not port_item.scene():
-                                        continue
-                                except (RuntimeError, AttributeError):
-                                    continue
-                                
-                                # Проверяем соответствие по имени и направлению
-                                is_output = port_item.is_output
-                                port_direction_match = (
-                                    (model_port.direction == PortDirection.OUTPUT and is_output) or
-                                    (model_port.direction == PortDirection.INPUT and not is_output)
-                                )
-                                
-                                if model_port.name == port_item.name and port_direction_match:
-                                    # Нашли соответствие - сохраняем маппинг
-                                    port_items[model_port.id] = port_item
-                                    break
+                            # Определяем направление порта
+                            is_output = model_port.direction == PortDirection.OUTPUT
+                            # Ищем соответствующий PortItem
+                            port_item = block_port_map.get((model_port.name, is_output))
+                            
+                            if port_item:
+                                # Нашли соответствие - сохраняем маппинг по ID из модели
+                                port_items[model_port.id] = port_item
                     except (RuntimeError, AttributeError):
                         continue
             
@@ -294,13 +295,24 @@ class NodeScene(QGraphicsScene):
                             self.addItem(connection_item)
                             src_port_item.add_connection(connection_item)
                             dst_port_item.add_connection(connection_item)
-                        except Exception:
+                        except Exception as e:
+                            # Логируем ошибку для отладки
+                            import traceback
+                            print(f"Ошибка при создании connection {conn.id}: {e}")
+                            traceback.print_exc()
                             continue
                     else:
-                        # Если порты не найдены, это может быть проблема с сохранением/загрузкой
-                        # Пропускаем эту связь, но не падаем
-                        pass
-                except (AttributeError, RuntimeError):
+                        # Если порты не найдены, выводим информацию для отладки
+                        missing_ports = []
+                        if not src_port_item:
+                            missing_ports.append(f"from_port_id={conn.from_port_id}")
+                        if not dst_port_item:
+                            missing_ports.append(f"to_port_id={conn.to_port_id}")
+                        if missing_ports:
+                            print(f"Connection {conn.id} не может быть восстановлена: не найдены порты {', '.join(missing_ports)}")
+                            print(f"Доступные port_ids в маппинге: {list(port_items.keys())[:10]}...")  # Первые 10 для отладки
+                except (AttributeError, RuntimeError) as e:
+                    print(f"Ошибка при обработке connection {conn.id}: {e}")
                     continue
         except Exception:
             pass
@@ -315,9 +327,16 @@ class NodeScene(QGraphicsScene):
             import uuid
             return str(uuid.uuid4())
         
+        # Убеждаемся, что используем правильный объект Scene из проекта
+        scene_to_use = self._scene_model
+        if self._project:
+            scene_in_project = self._project.find_scene(self._scene_model.id)
+            if scene_in_project:
+                scene_to_use = scene_in_project
+        
         # Ищем существующий порт по имени и направлению для этого блока
         is_output = port_item.is_output
-        for port in self._scene_model.ports:
+        for port in scene_to_use.ports:
             if port.node_id == block.id and port.name == port_item.name:
                 # Проверяем по направлению
                 if (port.direction == PortDirection.OUTPUT and is_output) or \
@@ -333,7 +352,11 @@ class NodeScene(QGraphicsScene):
             name=port_item.name,
             direction=PortDirection.OUTPUT if port_item.is_output else PortDirection.INPUT
         )
-        self._scene_model.add_port(port)
+        # Добавляем порт в правильный объект Scene из проекта
+        scene_to_use.add_port(port)
+        # Обновляем локальную ссылку, если это тот же объект
+        if self._scene_model.id == scene_to_use.id:
+            self._scene_model = scene_to_use
         return port_id
 
     # ---- grid ----
@@ -462,19 +485,45 @@ class NodeScene(QGraphicsScene):
 
             if isinstance(item, PortItem) and not item.is_output:
                 # Создаем связь в модели
-                if self._scene_model:
+                if self._scene_model and self._project:
                     # Получаем блоки из портов
                     src_node = self._find_parent_node_item(self._drag_src_port)
                     dst_node = self._find_parent_node_item(item)
                     
+                    # Проверяем, что оба узла найдены
+                    if not src_node or not dst_node:
+                        # Если узлы не найдены, удаляем временную связь
+                        self.removeItem(self._drag_connection)
+                        del self._drag_connection
+                        self._drag_connection = None
+                        self._drag_src_port = None
+                        event.accept()
+                        return
+                    
+                    # Убеждаемся, что используем правильный объект Scene из проекта
+                    # Это важно, чтобы изменения сохранялись в правильный объект
+                    scene_in_project = self._project.find_scene(self._scene_model.id)
+                    if not scene_in_project:
+                        scene_in_project = self._scene_model
+                    
                     from_port_id = self._get_or_create_port_id(
-                        src_node.block if src_node else None,
+                        src_node.block,
                         self._drag_src_port
                     )
                     to_port_id = self._get_or_create_port_id(
-                        dst_node.block if dst_node else None,
+                        dst_node.block,
                         item
                     )
+                    
+                    # Проверяем, что порты созданы
+                    if not from_port_id or not to_port_id:
+                        # Если порты не созданы, удаляем временную связь
+                        self.removeItem(self._drag_connection)
+                        del self._drag_connection
+                        self._drag_connection = None
+                        self._drag_src_port = None
+                        event.accept()
+                        return
                     
                     # Используем UUID для стабильного ID connection
                     connection_id = str(uuid.uuid4())
@@ -483,7 +532,11 @@ class NodeScene(QGraphicsScene):
                         from_port_id=from_port_id,
                         to_port_id=to_port_id
                     )
-                    self._scene_model.add_connection(connection)
+                    # Добавляем connection в правильный объект Scene из проекта
+                    scene_in_project.add_connection(connection)
+                    # Также обновляем локальную ссылку
+                    if self._scene_model.id == scene_in_project.id:
+                        self._scene_model = scene_in_project
                     self._drag_connection.connection_id = connection_id
                 
                 self._drag_connection.set_dst_port(item)
@@ -600,15 +653,22 @@ class NodeScene(QGraphicsScene):
         )
         
         if reply == QMessageBox.Yes:
+            # Убеждаемся, что используем правильный объект Scene из проекта
+            scene_to_use = self._scene_model
+            if self._project:
+                scene_in_project = self._project.find_scene(self._scene_model.id)
+                if scene_in_project:
+                    scene_to_use = scene_in_project
+            
             for item in selected_items:
                 # Сначала очищаем все связи от портов
                 for port in item.inputs + item.outputs:
                     # Создаем копию списка connections
                     connections_copy = list(port.connections)
                     for conn in connections_copy:
-                        # Удаляем связь из модели
-                        if conn.connection_id and self._scene_model:
-                            self._scene_model.remove_connection(conn.connection_id)
+                        # Удаляем связь из правильного объекта Scene
+                        if conn.connection_id:
+                            scene_to_use.remove_connection(conn.connection_id)
                         # Отсоединяем от портов
                         if conn.src_port and conn in conn.src_port.connections:
                             conn.src_port.remove_connection(conn)
@@ -618,8 +678,8 @@ class NodeScene(QGraphicsScene):
                         if conn in self.items():
                             self.removeItem(conn)
                 
-                # Удаляем из модели (это также удалит порты)
-                self._scene_model.remove_block(item.block.id)
+                # Удаляем из правильного объекта Scene (это также удалит порты и connections)
+                scene_to_use.remove_block(item.block.id)
                 # Удаляем визуально
                 self.removeItem(item)
     
@@ -638,8 +698,19 @@ class NodeScene(QGraphicsScene):
         )
         
         if reply == QMessageBox.Yes:
-            # Удаляем из модели
-            self._scene_model.remove_connection(connection_item.connection_id)
+            # Убеждаемся, что используем правильный объект Scene из проекта
+            scene_to_use = self._scene_model
+            if self._project:
+                scene_in_project = self._project.find_scene(self._scene_model.id)
+                if scene_in_project:
+                    scene_to_use = scene_in_project
+            
+            # Удаляем connection из правильного объекта Scene
+            scene_to_use.remove_connection(connection_item.connection_id)
+            
+            # Обновляем локальную ссылку, если это тот же объект
+            if self._scene_model.id == scene_to_use.id:
+                self._scene_model = scene_to_use
             
             # Отсоединяем от портов
             if connection_item.src_port:
