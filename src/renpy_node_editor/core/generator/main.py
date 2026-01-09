@@ -303,8 +303,17 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             
             if len(next_blocks_with_dist) > 1:
                 # Это разветвление - обрабатываем все параллельные ветки последовательно
-                # Без сортировки - просто в том порядке, в котором они есть
-                for next_id, _ in next_blocks_with_dist:
+                # Сортируем по позиции (сверху вниз, слева направо)
+                next_blocks_sorted = sorted(
+                    next_blocks_with_dist,
+                    key=lambda x: (
+                        next((b.y for b in scene.blocks if b.id == x[0]), 0),
+                        next((b.x for b in scene.blocks if b.id == x[0]), 0)
+                    )
+                )
+                
+                # Обрабатываем каждую параллельную ветку полностью до точки слияния
+                for next_id, _ in next_blocks_sorted:
                     if next_id not in visited:
                         # Обрабатываем всю цепочку этой ветки рекурсивно
                         process_chain_dfs(next_id)

@@ -19,7 +19,7 @@ def calculate_distance(block1: Block, block2: Block) -> float:
 def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:
     """
     Create mapping: block_id -> list of (next_block_id, distance) tuples
-    Без сортировки - просто в том порядке, в котором они есть
+    Sorted by distance (shorter connections first for parallel branches)
     """
     connections_map: Dict[str, List[Tuple[str, float]]] = defaultdict(list)
     
@@ -31,7 +31,7 @@ def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:
     # Create block_id -> Block mapping
     block_map: Dict[str, Block] = {block.id: block for block in scene.blocks}
     
-    # Process all connections (без расчета расстояния)
+    # Process all connections with distance calculation
     for conn in scene.connections:
         from_block_id = port_to_block.get(conn.from_port_id)
         to_block_id = port_to_block.get(conn.to_port_id)
@@ -41,10 +41,12 @@ def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:
             to_block = block_map.get(to_block_id)
             
             if from_block and to_block:
-                # Просто добавляем без расстояния (используем 0)
-                connections_map[from_block_id].append((to_block_id, 0.0))
+                distance = calculate_distance(from_block, to_block)
+                connections_map[from_block_id].append((to_block_id, distance))
     
-    # Без сортировки - оставляем в исходном порядке
+    # Sort connections by distance (shorter first) for parallel branches
+    for block_id in connections_map:
+        connections_map[block_id].sort(key=lambda x: x[1])
     
     return connections_map
 
