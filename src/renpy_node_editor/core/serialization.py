@@ -116,10 +116,24 @@ def _scene_from_dict(payload: Dict[str, Any]) -> Scene:
         _connection_from_dict(c) for c in payload.get("connections", [])
     ]
     
+    # ВАЖНО: восстанавливаем связь портов с блоками через port_ids
+    # Это нужно, так как при загрузке блоки и порты создаются отдельно
+    block_map = {block.id: block for block in blocks}
+    for port in ports:
+        block = block_map.get(port.node_id)
+        if block and port.id not in block.port_ids:
+            block.port_ids.append(port.id)
+    
     # Отладочный вывод для проверки загрузки connections
     print(f"DEBUG: Загрузка сцены {payload.get('id', 'unknown')}. Connections в JSON: {len(payload.get('connections', []))}, загружено: {len(connections)}")
     for conn in connections:
         print(f"  Connection: {conn.id}, from: {conn.from_port_id}, to: {conn.to_port_id}")
+    
+    print(f"DEBUG: Портов загружено: {len(ports)}")
+    for port in ports:
+        block = block_map.get(port.node_id)
+        if block:
+            print(f"  Port: {port.id}, node_id={port.node_id}, name={port.name}, в block.port_ids: {port.id in block.port_ids}")
 
     return Scene(
         id=payload["id"],

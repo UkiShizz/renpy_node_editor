@@ -179,6 +179,10 @@ class NodeScene(QGraphicsScene):
                 except Exception:
                     continue
             
+            # ВАЖНО: создаем порты в модели для всех блоков, если их еще нет
+            # Это нужно для правильного восстановления connections
+            self._ensure_ports_in_model()
+            
             # Создаем связи
             try:
                 self._create_connections()
@@ -223,10 +227,76 @@ class NodeScene(QGraphicsScene):
         
         return None
     
+    def _ensure_ports_in_model(self) -> None:
+        """Убедиться, что все порты блоков созданы в модели"""
+        if not self._scene_model:
+            return
+        
+        # Убеждаемся, что используем правильный объект Scene из проекта
+        scene_to_use = self._scene_model
+        if self._project:
+            scene_in_project = self._project.find_scene(self._scene_model.id)
+            if scene_in_project:
+                scene_to_use = scene_in_project
+                self._scene_model = scene_in_project
+        
+        # Проходим по всем визуальным блокам и создаем порты в модели, если их нет
+        items = list(self.items())
+        for item in items:
+            if isinstance(item, NodeItem):
+                try:
+                    if not item.scene() or not item.block:
+                        continue
+                    
+                    block = scene_to_use.find_block(item.block.id)
+                    if not block:
+                        continue
+                    
+                    # Создаем порты для всех PortItem этого блока
+                    for port_item in item.inputs + item.outputs:
+                        if not port_item:
+                            continue
+                        try:
+                            if not port_item.scene():
+                                continue
+                        except (RuntimeError, AttributeError):
+                            continue
+                        
+                        # Проверяем, есть ли уже порт с таким именем и направлением
+                        is_output = port_item.is_output
+                        port_exists = False
+                        for model_port in scene_to_use.ports:
+                            if (model_port.node_id == block.id and 
+                                model_port.name == port_item.name and
+                                ((model_port.direction == PortDirection.OUTPUT and is_output) or
+                                 (model_port.direction == PortDirection.INPUT and not is_output))):
+                                port_exists = True
+                                break
+                        
+                        # Если порта нет, создаем его
+                        if not port_exists:
+                            import uuid
+                            port_id = str(uuid.uuid4())
+                            port = Port(
+                                id=port_id,
+                                node_id=block.id,
+                                name=port_item.name,
+                                direction=PortDirection.OUTPUT if port_item.is_output else PortDirection.INPUT
+                            )
+                            scene_to_use.add_port(port)
+                except (RuntimeError, AttributeError):
+                    continue
+    
     def _create_connections(self) -> None:
         """Создать визуальные связи из модели"""
         if not self._scene_model or self._is_loading:
             return
+        
+        # Отладочный вывод
+        print(f"DEBUG: _create_connections вызван. Connections в модели: {len(self._scene_model.connections)}")
+        print(f"DEBUG: Ports в модели: {len(self._scene_model.ports)}")
+        for port in self._scene_model.ports:
+            print(f"  Port: id={port.id}, node_id={port.node_id}, name={port.name}, direction={port.direction}")
         
         # Создаем маппинг port_id -> PortItem
         # Сначала создаем маппинг по сохраненным портам из модели
@@ -261,22 +331,56 @@ class NodeScene(QGraphicsScene):
                             block_port_map[(port_item.name, port_item.is_output)] = port_item
                         
                         # Теперь сопоставляем порты из модели с визуальными портами
+                        # Сначала проверяем порты, которые есть в block.port_ids (это гарантирует правильное сопоставление)
                         for model_port in self._scene_model.ports:
                             if model_port.node_id != block.id:
                                 continue
                             
+                            # Проверяем, что порт принадлежит этому блоку (есть в block.port_ids)
+                            if model_port.id not in block.port_ids:
+                                # Порт не в списке port_ids блока - пропускаем
+                                continue
+                            
                             # Определяем направление порта
                             is_output = model_port.direction == PortDirection.OUTPUT
-                            # Ищем соответствующий PortItem
+                            # Ищем соответствующий PortItem по имени и направлению
                             port_item = block_port_map.get((model_port.name, is_output))
                             
                             if port_item:
                                 # Нашли соответствие - сохраняем маппинг по ID из модели
                                 port_items[model_port.id] = port_item
+                                print(f"DEBUG: Сопоставлен порт {model_port.id} (node_id={model_port.node_id}, name={model_port.name}) с PortItem")
+                            else:
+                                # Порт есть в модели, но визуальный PortItem не найден
+                                print(f"DEBUG: Порт {model_port.id} (node_id={model_port.node_id}, name={model_port.name}) есть в модели, но PortItem не найден")
+                        
+                        # Также проверяем порты, которые могут быть не в port_ids (для обратной совместимости)
+                        for model_port in self._scene_model.ports:
+                            if model_port.node_id != block.id:
+                                continue
+                            
+                            # Если порт уже сопоставлен, пропускаем
+                            if model_port.id in port_items:
+                                continue
+                            
+                            # Определяем направление порта
+                            is_output = model_port.direction == PortDirection.OUTPUT
+                            # Ищем соответствующий PortItem по имени и направлению
+                            port_item = block_port_map.get((model_port.name, is_output))
+                            
+                            if port_item:
+                                # Нашли соответствие - сохраняем маппинг по ID из модели
+                                port_items[model_port.id] = port_item
+                                print(f"DEBUG: Сопоставлен порт {model_port.id} (node_id={model_port.node_id}, name={model_port.name}) с PortItem (без port_ids)")
                     except (RuntimeError, AttributeError):
                         continue
             
+            # Отладочный вывод о найденных портах
+            print(f"DEBUG: Найдено портов в маппинге: {len(port_items)}")
+            print(f"DEBUG: Port IDs в маппинге: {list(port_items.keys())}")
+            
             # Теперь создаем связи, используя правильные port_id из модели
+            print(f"DEBUG: Обработка {len(self._scene_model.connections)} connections")
             for conn in self._scene_model.connections:
                 try:
                     src_port_item = port_items.get(conn.from_port_id)
