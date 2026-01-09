@@ -121,6 +121,62 @@ def escape_text(text: str) -> str:
     return text.replace('"', '\\"')
 
 
+def topological_sort_blocks(
+    scene: Scene,
+    connections_map: Dict[str, List[Tuple[str, float]]],
+    reverse_connections: Dict[str, Set[str]]
+) -> List[str]:
+    """
+    Топологическая сортировка блоков для правильного порядка обработки.
+    Возвращает список ID блоков в правильном порядке.
+    """
+    from renpy_node_editor.core.model import BlockType
+    
+    # Исключаем IMAGE и CHARACTER блоки из сортировки
+    block_ids = [
+        block.id for block in scene.blocks
+        if block.type not in (BlockType.IMAGE, BlockType.CHARACTER)
+    ]
+    
+    # Вычисляем количество необработанных входов для каждого блока
+    in_degree: Dict[str, int] = {}
+    for block_id in block_ids:
+        in_degree[block_id] = len(reverse_connections.get(block_id, set()))
+    
+    # Находим блоки без входов (стартовые блоки)
+    queue: List[str] = [
+        block_id for block_id in block_ids
+        if in_degree[block_id] == 0
+    ]
+    
+    # Сортируем стартовые блоки по позиции (сверху вниз, слева направо)
+    queue.sort(key=lambda bid: (
+        next((b.y for b in scene.blocks if b.id == bid), 0),
+        next((b.x for b in scene.blocks if b.id == bid), 0)
+    ))
+    
+    result: List[str] = []
+    
+    while queue:
+        # Берем блок с наименьшей позицией
+        current = queue.pop(0)
+        result.append(current)
+        
+        # Обрабатываем все выходы этого блока
+        for next_id, _ in connections_map.get(current, []):
+            if next_id in block_ids:
+                in_degree[next_id] -= 1
+                if in_degree[next_id] == 0:
+                    queue.append(next_id)
+                    # Сортируем очередь по позиции
+                    queue.sort(key=lambda bid: (
+                        next((b.y for b in scene.blocks if b.id == bid), 0),
+                        next((b.x for b in scene.blocks if b.id == bid), 0)
+                    ))
+    
+    return result
+
+
 def format_value(value: str) -> str:
     """Format value for Ren'Py code (detect type)"""
     if not value:

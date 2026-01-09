@@ -5,7 +5,8 @@ import re
 from typing import List, Dict, Set, Optional, Tuple
 from renpy_node_editor.core.model import Project, Scene, Block, BlockType
 from renpy_node_editor.core.generator.utils import (
-    get_block_connections, find_start_blocks, get_reverse_connections, INDENT
+    get_block_connections, find_start_blocks, get_reverse_connections,
+    topological_sort_blocks, INDENT
 )
 from renpy_node_editor.core.generator.blocks import (
     generate_label, generate_if, generate_while, generate_for,
@@ -130,13 +131,15 @@ def generate_block_chain(
     visited: Set[str],
     indent: str,
     char_name_map: Optional[Dict[str, str]] = None,
-    reverse_connections: Optional[Dict[str, Set[str]]] = None
+    reverse_connections: Optional[Dict[str, Set[str]]] = None,
+    recursive: bool = True
 ) -> str:
     """
-    Recursively generate chain of blocks.
-    For parallel connections, processes shorter connections first.
+    Generate code for a block and optionally its chain.
     
     Args:
+        recursive: If True, recursively processes connected blocks.
+                  If False, only processes the current block.
         reverse_connections: Mapping from block_id to set of block_ids that connect to it.
                             Used to detect merge points (blocks that should wait for all inputs).
     """
@@ -172,12 +175,12 @@ def generate_block_chain(
             
             if len(next_blocks) >= 1:
                 true_branch = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
                 )
             
             if len(next_blocks) >= 2:
                 false_branch = generate_block_chain(
-                    scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT, char_name_map
+                    scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_if
@@ -191,7 +194,7 @@ def generate_block_chain(
             
             if next_blocks:
                 loop_body = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_while
@@ -206,7 +209,7 @@ def generate_block_chain(
             
             if next_blocks:
                 loop_body = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_for
@@ -221,30 +224,32 @@ def generate_block_chain(
             if code:
                 lines.append(code)
         
-        # Continue through connections (already sorted by distance)
-        # Process shorter connections first for parallel branches
-        # ВАЖНО: используем то же множество visited, чтобы избежать дублирования
-        next_blocks_with_dist = connections_map.get(block.id, [])
-        
-        # Обрабатываем все параллельные ветки последовательно
-        # (в Ren'Py параллельные блоки выполняются последовательно в коде)
-        for next_id, _ in next_blocks_with_dist:
-            if next_id not in visited:
-                # Проверяем, все ли входы этого блока обработаны (для точек слияния)
-                if reverse_connections:
-                    input_blocks = reverse_connections.get(next_id, set())
-                    # Если есть несколько входов, проверяем, все ли обработаны
-                    if len(input_blocks) > 1:
-                        if not all(inp_id in visited for inp_id in input_blocks):
-                            # Не все входы обработаны - пропускаем пока
-                            # Этот блок будет обработан позже, когда все его входы будут готовы
-                            continue
-                
-                next_code = generate_block_chain(
-                    scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections
-                )
-                if next_code:
-                    lines.append(next_code)
+        # Continue through connections only if recursive mode is enabled
+        if recursive:
+            # Continue through connections (already sorted by distance)
+            # Process shorter connections first for parallel branches
+            # ВАЖНО: используем то же множество visited, чтобы избежать дублирования
+            next_blocks_with_dist = connections_map.get(block.id, [])
+            
+            # Обрабатываем все параллельные ветки последовательно
+            # (в Ren'Py параллельные блоки выполняются последовательно в коде)
+            for next_id, _ in next_blocks_with_dist:
+                if next_id not in visited:
+                    # Проверяем, все ли входы этого блока обработаны (для точек слияния)
+                    if reverse_connections:
+                        input_blocks = reverse_connections.get(next_id, set())
+                        # Если есть несколько входов, проверяем, все ли обработаны
+                        if len(input_blocks) > 1:
+                            if not all(inp_id in visited for inp_id in input_blocks):
+                                # Не все входы обработаны - пропускаем пока
+                                # Этот блок будет обработан позже, когда все его входы будут готовы
+                                continue
+                    
+                    next_code = generate_block_chain(
+                        scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive
+                    )
+                    if next_code:
+                        lines.append(next_code)
     
     return "".join(lines)
 
@@ -271,55 +276,26 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                 lines.append(code)
     else:
         # Используем топологическую сортировку для правильного порядка обработки
-        # Обрабатываем блоки в несколько проходов, чтобы правильно обработать параллельные ветки
+        sorted_block_ids = topological_sort_blocks(scene, connections_map, reverse_connections)
+        
         visited: Set[str] = set()
-        processed: Set[str] = set()
         
-        # Многопроходная обработка: обрабатываем блоки, пока есть что обрабатывать
-        max_iterations = len(scene.blocks) * 2  # Защита от бесконечного цикла
-        iteration = 0
-        
-        while iteration < max_iterations:
-            iteration += 1
-            progress_made = False
-            
-            # Пытаемся обработать все стартовые блоки
-            for start_block in start_blocks:
-                if start_block.id not in processed:
-                    code = generate_block_chain(
-                        scene, start_block.id, connections_map, visited, INDENT, char_name_map, reverse_connections
-                    )
-                    if code:
-                        lines.append(code)
-                        processed.add(start_block.id)
-                        progress_made = True
-            
-            # Пытаемся обработать блоки, которые еще не обработаны, но все их входы готовы
-            for block in scene.blocks:
-                if block.id not in processed and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
-                    # Проверяем, все ли входы обработаны
-                    if reverse_connections:
-                        input_blocks = reverse_connections.get(block.id, set())
-                        if input_blocks:
-                            if not all(inp_id in processed for inp_id in input_blocks):
-                                continue
-                    
-                    # Все входы обработаны - можно обработать этот блок
-                    code = generate_block_chain(
-                        scene, block.id, connections_map, visited, INDENT, char_name_map, reverse_connections
-                    )
-                    if code:
-                        lines.append(code)
-                        processed.add(block.id)
-                        progress_made = True
-            
-            if not progress_made:
-                break
+        # Обрабатываем блоки в топологическом порядке
+        # В топологической сортировке обрабатываем только сам блок, без рекурсии
+        # (потомки будут обработаны позже в правильном порядке)
+        for block_id in sorted_block_ids:
+            if block_id not in visited:
+                # Генерируем код только для этого блока (без рекурсии)
+                code = generate_block_chain(
+                    scene, block_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
+                )
+                if code:
+                    lines.append(code)
         
         # Add unprocessed blocks (блоки без соединений)
         # IMAGE и CHARACTER блоки не генерируются здесь - они в секции определений
         for block in scene.blocks:
-            if block.id not in processed and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
+            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
                 code = generate_block(block, INDENT, char_name_map)
                 if code:
                     lines.append(code)
