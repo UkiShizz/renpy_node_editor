@@ -303,11 +303,13 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
     if not start_blocks:
         # Нет START блоков - генерируем все блоки с отступом
         # Но если это первая сцена и нет label start, нужно создать его
+        print(f"DEBUG: Нет START блоков в сцене {scene.name}, генерируем все блоки")
         indent = INDENT
         for block in sorted(scene.blocks, key=lambda b: (b.y, b.x)):
             # Пропускаем IMAGE и CHARACTER блоки - они в секции определений
             if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
                 continue
+            print(f"DEBUG: Генерация блока {block.id} типа {block.type}")
             code = generate_block(block, indent, char_name_map, project_scenes)
             if code:
                 lines.append(code)
