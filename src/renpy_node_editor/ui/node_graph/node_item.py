@@ -27,6 +27,7 @@ def _get_block_colors(block_type: BlockType) -> tuple[QColor, QColor, QColor]:
         BlockType.IMAGE: (QColor("#70AD47"), QColor("#8FC966"), QColor("#4F7A2F")),
         
         # Логика - оранжевый/красный градиент
+        BlockType.START: (QColor("#FFD700"), QColor("#FFE44D"), QColor("#CCAA00")),  # Золотой для стартового блока
         BlockType.IF: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
         BlockType.ELIF: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
         BlockType.ELSE: (QColor("#FF6B6B"), QColor("#FF8E8E"), QColor("#CC4545")),
@@ -166,10 +167,12 @@ class NodeItem(QGraphicsRectItem):
 
     def _create_ports(self) -> None:
         """Create input port on left and output port(s) on right"""
-        # Входной порт слева
-        in_port = PortItem(parent=self, is_output=False, name="in")
-        in_port.setPos(-6, self.HEIGHT / 2)
-        self.inputs.append(in_port)
+        # START блок не имеет входного порта - это точка входа
+        if self.block.type != BlockType.START:
+            # Входной порт слева
+            in_port = PortItem(parent=self, is_output=False, name="in")
+            in_port.setPos(-6, self.HEIGHT / 2)
+            self.inputs.append(in_port)
 
         # Выходные порты справа
         if self.block.type == BlockType.IF:

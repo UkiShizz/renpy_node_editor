@@ -77,7 +77,7 @@ class BlockPalette(QListWidget):
                 BlockType.SCENE, BlockType.SHOW, BlockType.HIDE, BlockType.IMAGE
             ],
             "🔀 Логика и управление": [
-                BlockType.IF, BlockType.WHILE, BlockType.FOR, BlockType.MENU, 
+                BlockType.START, BlockType.IF, BlockType.WHILE, BlockType.FOR, BlockType.MENU, 
                 BlockType.JUMP, BlockType.CALL, BlockType.LABEL, BlockType.RETURN
             ],
             "🎬 Эффекты и переходы": [
