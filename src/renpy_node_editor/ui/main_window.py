@@ -370,7 +370,6 @@ class MainWindow(QMainWindow):
             
             # Если папка уже существует, спрашиваем подтверждение
             if project_dir.exists():
-                from PySide6.QtWidgets import QMessageBox
                 reply = QMessageBox.question(
                     self,
                     "Папка существует",

@@ -54,9 +54,18 @@ def get_block_connections(scene: Scene) -> Dict[str, List[Tuple[str, float]]]:
 def find_start_blocks(scene: Scene, connections_map: Dict[str, List[Tuple[str, float]]]) -> List[Block]:
     """
     Find starting blocks (those with no inputs), sorted by position (top to bottom, left to right).
+    Если есть START блок, он всегда является единственным стартовым блоком.
     IMAGE and CHARACTER blocks are excluded from start_blocks even if they have no inputs,
     as they should be in the definitions section, not in the scene flow.
     """
+    from renpy_node_editor.core.model import BlockType
+    
+    # Сначала ищем START блок - если он есть, он всегда является точкой входа
+    start_block = next((b for b in scene.blocks if b.type == BlockType.START), None)
+    if start_block:
+        return [start_block]
+    
+    # Если нет START блока, используем старую логику
     has_input: Set[str] = set()
     for targets_with_dist in connections_map.values():
         # Extract block IDs from (block_id, distance) tuples
@@ -64,10 +73,9 @@ def find_start_blocks(scene: Scene, connections_map: Dict[str, List[Tuple[str, f
     
     # Исключаем IMAGE и CHARACTER блоки из start_blocks
     # Они должны быть в секции определений, а не в начале сцены
-    from renpy_node_editor.core.model import BlockType
     start_blocks = [
         b for b in scene.blocks 
-        if b.id not in has_input and b.type not in (BlockType.IMAGE, BlockType.CHARACTER)
+        if b.id not in has_input and b.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START)
     ]
     
     # Если все блоки - IMAGE/CHARACTER, но есть соединения, 
@@ -89,14 +97,13 @@ def find_start_blocks(scene: Scene, connections_map: Dict[str, List[Tuple[str, f
         if next_after_image_char:
             start_blocks = [
                 b for b in scene.blocks 
-                if b.id in next_after_image_char and b.type not in (BlockType.IMAGE, BlockType.CHARACTER)
+                if b.id in next_after_image_char and b.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START)
             ]
     
     if not connections_map:
-        # Если нет соединений, возвращаем все блоки кроме IMAGE/CHARACTER
-        from renpy_node_editor.core.model import BlockType
+        # Если нет соединений, возвращаем все блоки кроме IMAGE/CHARACTER/START
         return sorted(
-            [b for b in scene.blocks if b.type not in (BlockType.IMAGE, BlockType.CHARACTER)],
+            [b for b in scene.blocks if b.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START)],
             key=lambda b: (b.y, b.x)
         )
     

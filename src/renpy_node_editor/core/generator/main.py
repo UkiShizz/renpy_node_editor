@@ -63,6 +63,10 @@ def normalize_variable_name(name: str) -> str:
 
 def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, str]] = None) -> str:
     """Generate code for a single block"""
+    # START блок не генерирует код - это просто точка входа
+    if block.type == BlockType.START:
+        return ""
+    
     # Special handling for blocks that need connection traversal
     if block.type in (BlockType.IF, BlockType.WHILE, BlockType.FOR):
         return ""  # Handled separately in chain generation
@@ -341,8 +345,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                 # Проверяем, все ли входы блока обработаны (для точек слияния)
                 if reverse_connections:
                     input_blocks = reverse_connections.get(current_id, set())
-                    if len(input_blocks) > 1:
-                        # Это точка слияния - проверяем, все ли входы обработаны
+                    if input_blocks:  # Если есть хотя бы один вход
+                        # Проверяем, все ли входы обработаны
                         if not all(inp_id in visited for inp_id in input_blocks):
                             # Не все входы обработаны - останавливаемся, не обрабатываем этот блок
                             return
@@ -373,8 +377,18 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                     # После обработки всех параллельных веток, выходим из цикла
                     break
                 elif len(next_blocks_with_dist) == 1:
-                    # Один выход - продолжаем цепочку
-                    current_id = next_blocks_with_dist[0][0]
+                    # Один выход - проверяем, не является ли он точкой слияния
+                    next_id = next_blocks_with_dist[0][0]
+                    if reverse_connections:
+                        next_inputs = reverse_connections.get(next_id, set())
+                        if len(next_inputs) > 1:
+                            # Следующий блок - точка слияния
+                            # Проверяем, все ли входы обработаны
+                            if not all(inp_id in visited for inp_id in next_inputs):
+                                # Не все входы обработаны - останавливаемся здесь
+                                break
+                    # Продолжаем цепочку
+                    current_id = next_id
                 else:
                     # Нет выходов - конец цепочки
                     break
