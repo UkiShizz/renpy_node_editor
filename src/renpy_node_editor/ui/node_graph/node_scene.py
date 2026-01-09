@@ -63,8 +63,14 @@ class NodeScene(QGraphicsScene):
         
         self._is_loading = True
         try:
-            # Блокируем сигналы во время очистки
+            # Блокируем сигналы во время очистки (включая selectionChanged)
             self.blockSignals(True)
+            
+            # Отключаем обработчик selectionChanged временно
+            try:
+                self.selectionChanged.disconnect(self._on_selection_changed)
+            except (TypeError, RuntimeError):
+                pass
             
             # Очищаем выделение перед очисткой элементов
             try:
@@ -84,16 +90,27 @@ class NodeScene(QGraphicsScene):
             
             # Безопасно очищаем все элементы
             try:
-                # Сначала очищаем все соединения из портов, чтобы избежать проблем при удалении
+                # Сначала получаем список всех элементов
                 items = list(self.items())
+                
+                # Отключаем все соединения из портов перед удалением
                 for item in items:
                     if isinstance(item, NodeItem):
-                        # Отключаем обновление позиции для всех портов
-                        for port in item.inputs + item.outputs:
-                            if port and hasattr(port, 'connections'):
-                                port.connections.clear()
+                        try:
+                            # Отключаем обновление позиции для всех портов
+                            for port in item.inputs + item.outputs:
+                                if port and hasattr(port, 'connections'):
+                                    # Создаем копию списка для безопасного удаления
+                                    connections_copy = list(port.connections) if port.connections else []
+                                    for conn in connections_copy:
+                                        try:
+                                            port.remove_connection(conn)
+                                        except Exception:
+                                            pass
+                        except Exception:
+                            pass
                 
-                # Удаляем ConnectionItem (теперь порты не будут пытаться их обновить)
+                # Удаляем ConnectionItem
                 for item in items:
                     if isinstance(item, ConnectionItem):
                         try:
@@ -101,16 +118,18 @@ class NodeScene(QGraphicsScene):
                                 # Отключаем от портов перед удалением
                                 if hasattr(item, 'src_port') and item.src_port:
                                     try:
-                                        item.src_port.remove_connection(item)
+                                        if item in item.src_port.connections:
+                                            item.src_port.remove_connection(item)
                                     except Exception:
                                         pass
                                 if hasattr(item, 'dst_port') and item.dst_port:
                                     try:
-                                        item.dst_port.remove_connection(item)
+                                        if item in item.dst_port.connections:
+                                            item.dst_port.remove_connection(item)
                                     except Exception:
                                         pass
                                 self.removeItem(item)
-                        except Exception:
+                        except (RuntimeError, AttributeError):
                             pass
                 
                 # Затем удаляем NodeItem (порты удалятся автоматически)
@@ -119,7 +138,7 @@ class NodeScene(QGraphicsScene):
                         try:
                             if item.scene() == self:
                                 self.removeItem(item)
-                        except Exception:
+                        except (RuntimeError, AttributeError):
                             pass
             except Exception:
                 pass
@@ -127,6 +146,12 @@ class NodeScene(QGraphicsScene):
             # Устанавливаем новую модель
             self._project = project
             self._scene_model = scene
+            
+            # Подключаем обработчик selectionChanged обратно
+            try:
+                self.selectionChanged.connect(self._on_selection_changed)
+            except (TypeError, RuntimeError):
+                pass
             
             # Создаем блоки
             for block in scene.blocks:
@@ -422,36 +447,72 @@ class NodeScene(QGraphicsScene):
     
     def _on_selection_changed(self) -> None:
         """Handle selection changes and emit signal with selected block"""
+        # Игнорируем изменения выделения во время загрузки
+        if self._is_loading:
+            return
+        
         try:
             # Проверяем, что сцена еще существует
             if not self._scene_model:
-                self.node_selection_changed.emit(None)
+                try:
+                    self.node_selection_changed.emit(None)
+                except (RuntimeError, AttributeError):
+                    pass
                 return
             
-            selected_items = self.selectedItems()
+            try:
+                selected_items = self.selectedItems()
+            except (RuntimeError, AttributeError):
+                try:
+                    self.node_selection_changed.emit(None)
+                except (RuntimeError, AttributeError):
+                    pass
+                return
+            
             if selected_items:
                 # Get the first selected item
                 item = selected_items[0]
-                # Проверяем, что элемент еще в сцене
-                if not item.scene():
-                    self.node_selection_changed.emit(None)
-                    return
-                
-                if isinstance(item, NodeItem):
-                    # Проверяем, что блок еще существует в модели
-                    if self._scene_model.find_block(item.block.id):
-                        self.node_selection_changed.emit(item.block)
+                try:
+                    # Проверяем, что элемент еще в сцене
+                    if not item or not item.scene():
+                        try:
+                            self.node_selection_changed.emit(None)
+                        except (RuntimeError, AttributeError):
+                            pass
+                        return
+                    
+                    if isinstance(item, NodeItem):
+                        try:
+                            # Проверяем, что блок еще существует в модели
+                            if item.block and self._scene_model.find_block(item.block.id):
+                                self.node_selection_changed.emit(item.block)
+                            else:
+                                self.node_selection_changed.emit(None)
+                        except (AttributeError, RuntimeError):
+                            try:
+                                self.node_selection_changed.emit(None)
+                            except (RuntimeError, AttributeError):
+                                pass
                     else:
+                        try:
+                            self.node_selection_changed.emit(None)
+                        except (RuntimeError, AttributeError):
+                            pass
+                except (AttributeError, RuntimeError):
+                    try:
                         self.node_selection_changed.emit(None)
-                else:
-                    self.node_selection_changed.emit(None)
+                    except (RuntimeError, AttributeError):
+                        pass
             else:
-                self.node_selection_changed.emit(None)
+                try:
+                    self.node_selection_changed.emit(None)
+                except (RuntimeError, AttributeError):
+                    pass
         except Exception:
             # В случае ошибки просто эмитим None
             try:
                 self.node_selection_changed.emit(None)
-            except Exception:
+            except (RuntimeError, AttributeError):
                 pass
     
     # ---- deletion ----

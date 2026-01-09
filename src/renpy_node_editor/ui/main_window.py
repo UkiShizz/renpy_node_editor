@@ -208,20 +208,28 @@ class MainWindow(QMainWindow):
     def _connect_scene_signals(self) -> None:
         """Подключить сигналы сцены к панели свойств"""
         try:
+            if not self.node_view:
+                return
             scene = self.node_view.node_scene
             if not scene:
                 return
             # Отключаем ВСЕ старые соединения если есть
             try:
+                # Блокируем сигналы перед отключением
+                scene.blockSignals(True)
                 if scene.receivers(scene.node_selection_changed) > 0:
                     scene.node_selection_changed.disconnect()
-            except (TypeError, RuntimeError):
-                pass
+                scene.blockSignals(False)
+            except (TypeError, RuntimeError, AttributeError):
+                try:
+                    scene.blockSignals(False)
+                except:
+                    pass
             # Подключаем новые
             scene.node_selection_changed.connect(
                 self.properties_panel.set_block
             )
-        except Exception:
+        except (AttributeError, RuntimeError):
             pass
     
     def _create_default_scene_if_needed(self, project: Project) -> Scene:
@@ -564,8 +572,15 @@ class MainWindow(QMainWindow):
         try:
             from renpy_node_editor.ui.node_graph.node_item import NodeItem
             
+            # Проверяем, что view и scene существуют
+            if not self.node_view:
+                return
             scene = self.node_view.node_scene
             if not scene or not scene._scene_model:
+                return
+            
+            # Проверяем, что не идет загрузка новой сцены
+            if hasattr(scene, '_is_loading') and scene._is_loading:
                 return
             
             # Проверяем, что блок еще существует в текущей сцене
@@ -573,15 +588,23 @@ class MainWindow(QMainWindow):
                 return
             
             # Find the NodeItem for this block and update its display
-            for item in scene.items():
+            try:
+                items = list(scene.items())
+            except (RuntimeError, AttributeError):
+                return
+            
+            for item in items:
                 if isinstance(item, NodeItem):
-                    # Проверяем, что элемент еще в сцене
-                    if not item.scene():
+                    try:
+                        # Проверяем, что элемент еще в сцене
+                        if not item.scene():
+                            continue
+                        if item.block and item.block.id == block.id:
+                            item.update_display()
+                            break
+                    except (AttributeError, RuntimeError):
                         continue
-                    if item.block.id == block.id:
-                        item.update_display()
-                        break
-        except Exception:
+        except (AttributeError, RuntimeError):
             pass
     
     def _on_center_view(self) -> None:
@@ -600,9 +623,19 @@ class MainWindow(QMainWindow):
         scene = found_scene
         
         # Проверяем, что это не та же сцена (избегаем лишних перезагрузок)
-        if (self.node_view.node_scene._scene_model and
-            self.node_view.node_scene._scene_model.id == scene.id):
-            return  # Уже загружена эта сцена
+        try:
+            current_scene_model = None
+            if (self.node_view and 
+                hasattr(self.node_view, 'node_scene') and 
+                self.node_view.node_scene and
+                hasattr(self.node_view.node_scene, '_scene_model')):
+                current_scene_model = self.node_view.node_scene._scene_model
+            
+            if current_scene_model and current_scene_model.id == scene.id:
+                return  # Уже загружена эта сцена
+        except (AttributeError, RuntimeError):
+            # Если возникла ошибка при проверке, просто продолжаем загрузку
+            pass
         
         try:
             self._load_project(self._controller.project, scene)
