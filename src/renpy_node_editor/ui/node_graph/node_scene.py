@@ -112,34 +112,49 @@ class NodeScene(QGraphicsScene):
                                             port.connections.clear()
                                         except Exception:
                                             pass
-                        except Exception:
+                        except (RuntimeError, AttributeError):
                             pass
                 
-                # Используем clear() для полной очистки - это безопаснее, чем ручное удаление
-                # clear() удаляет все элементы сразу и предотвращает каскадные обновления
-                self.clear()
-            except Exception:
-                # Если clear() не сработал, пытаемся удалить вручную
-                try:
-                    items = list(self.items())
-                    for item in items:
+                # Удаляем ConnectionItem сначала
+                for item in items:
+                    if isinstance(item, ConnectionItem):
+                        try:
+                            if item.scene() == self:
+                                # Отключаем от портов перед удалением
+                                if hasattr(item, 'src_port') and item.src_port:
+                                    try:
+                                        if hasattr(item.src_port, 'connections') and item in item.src_port.connections:
+                                            item.src_port.connections.remove(item)
+                                    except (RuntimeError, AttributeError):
+                                        pass
+                                if hasattr(item, 'dst_port') and item.dst_port:
+                                    try:
+                                        if hasattr(item.dst_port, 'connections') and item in item.dst_port.connections:
+                                            item.dst_port.connections.remove(item)
+                                    except (RuntimeError, AttributeError):
+                                        pass
+                                self.removeItem(item)
+                        except (RuntimeError, AttributeError):
+                            pass
+                
+                # Затем удаляем NodeItem (порты удалятся автоматически)
+                for item in items:
+                    if isinstance(item, NodeItem):
                         try:
                             if item.scene() == self:
                                 self.removeItem(item)
                         except (RuntimeError, AttributeError):
                             pass
+            except Exception:
+                # Если что-то пошло не так, используем clear() как последний вариант
+                try:
+                    self.clear()
                 except Exception:
                     pass
             
-            # Устанавливаем новую модель
+            # Устанавливаем новую модель ПОСЛЕ очистки
             self._project = project
             self._scene_model = scene
-            
-            # Подключаем обработчик selectionChanged обратно
-            try:
-                self.selectionChanged.connect(self._on_selection_changed)
-            except (TypeError, RuntimeError):
-                pass
             
             # Создаем блоки
             for block in scene.blocks:
@@ -147,13 +162,16 @@ class NodeScene(QGraphicsScene):
                     node_item = self._create_node_item_for_block(block)
                     # Включаем обратно флаги для новых элементов
                     if node_item:
-                        node_item.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
-                        for port in node_item.inputs + node_item.outputs:
-                            if port:
-                                try:
-                                    port.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
-                                except Exception:
-                                    pass
+                        try:
+                            node_item.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+                            for port in node_item.inputs + node_item.outputs:
+                                if port:
+                                    try:
+                                        port.setFlag(QGraphicsItem.ItemSendsScenePositionChanges, True)
+                                    except Exception:
+                                        pass
+                        except (RuntimeError, AttributeError):
+                            pass
                 except Exception:
                     continue
             
@@ -161,6 +179,12 @@ class NodeScene(QGraphicsScene):
             try:
                 self._create_connections()
             except Exception:
+                pass
+            
+            # Подключаем обработчик selectionChanged обратно ПОСЛЕ создания всех элементов
+            try:
+                self.selectionChanged.connect(self._on_selection_changed)
+            except (TypeError, RuntimeError):
                 pass
         except Exception:
             # Устанавливаем модель даже при ошибке

@@ -30,6 +30,7 @@ class SceneManagerPanel(QWidget):
         
         self._project: Optional[Project] = None
         self._current_scene: Optional[Scene] = None
+        self._is_updating_selection = False  # Флаг для предотвращения рекурсивных вызовов
         
         self.setStyleSheet("""
             QWidget {
@@ -122,26 +123,36 @@ class SceneManagerPanel(QWidget):
     def set_current_scene(self, scene: Optional[Scene]) -> None:
         """Установить текущую сцену"""
         self._current_scene = scene
-        self._refresh_scenes_list()
+        # Блокируем сигналы при программном обновлении выделения
+        self._is_updating_selection = True
+        try:
+            self._refresh_scenes_list()
+        finally:
+            self._is_updating_selection = False
     
     def _refresh_scenes_list(self) -> None:
         """Обновить список сцен"""
-        self.scenes_list.clear()
-        
-        if not self._project:
-            return
-        
-        for scene in self._project.scenes:
-            item_text = f"{scene.name}\n  ({scene.label})"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, scene.id)
+        # Блокируем сигналы при обновлении списка
+        self.scenes_list.blockSignals(True)
+        try:
+            self.scenes_list.clear()
             
-            # Выделяем текущую сцену
-            if self._current_scene and scene.id == self._current_scene.id:
-                item.setSelected(True)
-                item.setForeground(QColor("#4A90E2"))
+            if not self._project:
+                return
             
-            self.scenes_list.addItem(item)
+            for scene in self._project.scenes:
+                item_text = f"{scene.name}\n  ({scene.label})"
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, scene.id)
+                
+                # Выделяем текущую сцену
+                if self._current_scene and scene.id == self._current_scene.id:
+                    item.setSelected(True)
+                    item.setForeground(QColor("#4A90E2"))
+                
+                self.scenes_list.addItem(item)
+        finally:
+            self.scenes_list.blockSignals(False)
     
     def _on_add_scene(self) -> None:
         """Создать новую сцену"""
@@ -235,7 +246,10 @@ class SceneManagerPanel(QWidget):
             
             # Выбираем первую доступную сцену
             if self._project.scenes:
-                self.scene_selected.emit(self._project.scenes[0])
+                new_scene = self._project.scenes[0]
+                # Обновляем текущую сцену перед эмиссией сигнала
+                self._current_scene = new_scene
+                self.scene_selected.emit(new_scene)
     
     def _on_scene_double_clicked(self, item: QListWidgetItem) -> None:
         """Обработка двойного клика по сцене"""
@@ -245,10 +259,17 @@ class SceneManagerPanel(QWidget):
         
         scene = self._project.find_scene(scene_id)
         if scene:
+            # Проверяем, что это не та же сцена (избегаем лишних перезагрузок)
+            if self._current_scene and self._current_scene.id == scene.id:
+                return
             self.scene_selected.emit(scene)
     
     def _on_scene_selection_changed(self) -> None:
         """Обработка изменения выбора сцены"""
+        # Игнорируем изменения во время программного обновления
+        if self._is_updating_selection:
+            return
+        
         current_item = self.scenes_list.currentItem()
         if not current_item or not self._project:
             return
@@ -256,4 +277,7 @@ class SceneManagerPanel(QWidget):
         scene_id = current_item.data(Qt.UserRole)
         scene = self._project.find_scene(scene_id)
         if scene:
+            # Проверяем, что это не та же сцена (избегаем лишних перезагрузок)
+            if self._current_scene and self._current_scene.id == scene.id:
+                return
             self.scene_selected.emit(scene)
