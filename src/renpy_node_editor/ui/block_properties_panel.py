@@ -778,8 +778,9 @@ class BlockPropertiesPanel(QWidget):
                 self.current_block.params[key] = widget.isChecked()
             elif isinstance(widget, QComboBox):
                 # Для комбобокса берем текущий текст (может быть выбран из списка или введен вручную)
-                text = widget.currentText()
-                self.current_block.params[key] = text if text else None
+                text = widget.currentText().strip()
+                # Сохраняем пустую строку вместо None для пустых значений
+                self.current_block.params[key] = text if text else ""
         
         # Сохраняем варианты меню
         if "_choices_data" in self._param_widgets:

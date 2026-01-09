@@ -503,25 +503,69 @@ def extract_image_blocks(project: Project) -> Dict[str, str]:
     return images
 
 
+def extract_background_images(project: Project) -> Dict[str, str]:
+    """
+    Извлекает изображения, используемые в SCENE блоках как background.
+    Возвращает словарь {имя: путь} для изображений, которые нужно определить.
+    """
+    from renpy_node_editor.core.generator.blocks import safe_get_str
+    from pathlib import Path
+    
+    backgrounds: Dict[str, str] = {}
+    
+    for scene in project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.SCENE:
+                bg = safe_get_str(block.params, "background", "")
+                if bg and bg not in ("black", "white"):
+                    # Это не стандартный фон - может быть изображение
+                    # Если это выглядит как имя изображения (содержит пробел или начинается с "bg"),
+                    # но не определено, нужно попытаться найти путь
+                    # Пока просто сохраняем имя, путь будет определен позже
+                    if bg not in backgrounds:
+                        # Пытаемся найти путь из IMAGE блоков
+                        found_path = None
+                        for scene2 in project.scenes:
+                            for block2 in scene2.blocks:
+                                if block2.type == BlockType.IMAGE:
+                                    name = safe_get_str(block2.params, "name")
+                                    if name == bg:
+                                        found_path = safe_get_str(block2.params, "path")
+                                        break
+                            if found_path:
+                                break
+                        
+                        if found_path:
+                            backgrounds[bg] = found_path
+                        # Если путь не найден, не добавляем - пользователь должен определить изображение сам
+    
+    return backgrounds
+
+
 def generate_definitions(project: Project) -> str:
     """Generate global definitions (define, default, image)"""
     lines: List[str] = []
     
     # Image definitions - собираем из всех IMAGE блоков в сценах
     images = extract_image_blocks(project)
-    if images:
-        lines.append("# Image Definitions\n")
-        for name, path in sorted(images.items()):
-            lines.append(f"image {name} = \"{path}\"\n")
-        lines.append("\n")
     
     # Также добавляем изображения из project.images (если есть)
     if project.images:
         for name, path in sorted(project.images.items()):
             if name not in images:  # Не дублируем
-                lines.append(f"image {name} = \"{path}\"\n")
-        if project.images and not images:
-            lines.append("\n")
+                images[name] = path
+    
+    # Извлекаем изображения, используемые в SCENE блоках
+    background_images = extract_background_images(project)
+    for name, path in background_images.items():
+        if name not in images:  # Не дублируем
+            images[name] = path
+    
+    if images:
+        lines.append("# Image Definitions\n")
+        for name, path in sorted(images.items()):
+            lines.append(f"image {name} = \"{path}\"\n")
+        lines.append("\n")
     
     # Character definitions
     if project.characters:

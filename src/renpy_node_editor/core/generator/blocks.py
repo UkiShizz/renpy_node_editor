@@ -212,7 +212,8 @@ def generate_return(block: Block, indent: str) -> str:
 
 def generate_scene(block: Block, indent: str) -> str:
     """Generate scene statement"""
-    bg = safe_get_str(block.params, "background", "black")
+    bg = safe_get_str(block.params, "background", "")
+    # Если background не указан, используем "black" по умолчанию
     if not bg:
         bg = "black"
     
