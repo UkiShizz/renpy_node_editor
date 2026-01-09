@@ -259,43 +259,57 @@ def generate_block_chain(
         # Continue through connections only if recursive mode is enabled
         if recursive:
             print(f"DEBUG generate_block_chain: Рекурсивный режим включен, обрабатываем связи блока {start_block_id}")
-            # Continue through connections (already sorted by distance)
+            # Continue through connections
             next_blocks_with_dist = connections_map.get(block.id, [])
             
-            # Для последовательной цепочки обрабатываем только первый выход
-            # Для параллельных веток (когда несколько выходов) обрабатываем все, но в правильном порядке
-            if len(next_blocks_with_dist) == 1:
-                # Один выход - последовательная цепочка, обрабатываем только его
-                next_id, dist = next_blocks_with_dist[0]
-                if next_id not in visited:
-                    print(f"DEBUG generate_block_chain: Последовательная цепочка - обрабатываем единственный выход {next_id} (расстояние: {dist})")
-                    next_code = generate_block_chain(
-                        scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes, generated_labels=generated_labels, all_possible_labels=all_possible_labels
-                    )
-                    if next_code:
-                        lines.append(next_code)
-            else:
-                # Несколько выходов - параллельные ветки, обрабатываем все в порядке расстояния
-                print(f"DEBUG generate_block_chain: Параллельные ветки - обрабатываем {len(next_blocks_with_dist)} выходов")
-                for next_id, dist in next_blocks_with_dist:
+            # Сортируем выходы по позиции (y, x) для правильного порядка, а не только по расстоянию
+            if next_blocks_with_dist:
+                # Сортируем по позиции блоков (сверху вниз, слева направо)
+                def get_block_position(block_id: str) -> Tuple[float, float]:
+                    b = scene.find_block(block_id)
+                    if b:
+                        return (b.y, b.x)
+                    return (0.0, 0.0)
+                
+                next_blocks_sorted = sorted(
+                    next_blocks_with_dist,
+                    key=lambda x: get_block_position(x[0])
+                )
+                
+                # Для последовательной цепочки обрабатываем только первый выход
+                # Для параллельных веток (когда несколько выходов) обрабатываем все, но в правильном порядке
+                if len(next_blocks_sorted) == 1:
+                    # Один выход - последовательная цепочка, обрабатываем только его
+                    next_id, dist = next_blocks_sorted[0]
                     if next_id not in visited:
-                        # Проверяем, все ли входы этого блока обработаны (для точек слияния)
-                        if reverse_connections:
-                            input_blocks = reverse_connections.get(next_id, set())
-                            # Если есть несколько входов, проверяем, все ли обработаны
-                            if len(input_blocks) > 1:
-                                if not all(inp_id in visited for inp_id in input_blocks):
-                                    # Не все входы обработаны - пропускаем пока
-                                    # Этот блок будет обработан позже, когда все его входы будут готовы
-                                    print(f"DEBUG generate_block_chain: Блок {next_id} имеет необработанные входы: {input_blocks - visited}, пропускаем")
-                                    continue
-                        
-                        print(f"DEBUG generate_block_chain: Обрабатываем выход блока {start_block_id}: {next_id} (расстояние: {dist})")
+                        print(f"DEBUG generate_block_chain: Последовательная цепочка - обрабатываем единственный выход {next_id} (расстояние: {dist})")
                         next_code = generate_block_chain(
                             scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes, generated_labels=generated_labels, all_possible_labels=all_possible_labels
                         )
                         if next_code:
                             lines.append(next_code)
+                else:
+                    # Несколько выходов - параллельные ветки, обрабатываем все в порядке позиции
+                    print(f"DEBUG generate_block_chain: Параллельные ветки - обрабатываем {len(next_blocks_sorted)} выходов в порядке позиции")
+                    for next_id, dist in next_blocks_sorted:
+                        if next_id not in visited:
+                            # Проверяем, все ли входы этого блока обработаны (для точек слияния)
+                            if reverse_connections:
+                                input_blocks = reverse_connections.get(next_id, set())
+                                # Если есть несколько входов, проверяем, все ли обработаны
+                                if len(input_blocks) > 1:
+                                    if not all(inp_id in visited for inp_id in input_blocks):
+                                        # Не все входы обработаны - пропускаем пока
+                                        # Этот блок будет обработан позже, когда все его входы будут готовы
+                                        print(f"DEBUG generate_block_chain: Блок {next_id} имеет необработанные входы: {input_blocks - visited}, пропускаем")
+                                        continue
+                            
+                            print(f"DEBUG generate_block_chain: Обрабатываем выход блока {start_block_id}: {next_id} (позиция: {get_block_position(next_id)})")
+                            next_code = generate_block_chain(
+                                scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes, generated_labels=generated_labels, all_possible_labels=all_possible_labels
+                            )
+                            if next_code:
+                                lines.append(next_code)
     
     return "".join(lines)
 
@@ -508,78 +522,65 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         ]
         blocks_to_generate.sort(key=lambda x: (x[1], x[2]))  # Сортируем по level, затем sublevel
         
+        print(f"DEBUG: Блоки для генерации в порядке номеров: {len(blocks_to_generate)}")
+        for block_id, level, sublevel in blocks_to_generate[:10]:  # Показываем первые 10
+            block = scene.find_block(block_id)
+            if block:
+                print(f"  Блок {block_id} (level={level}, sublevel={sublevel}): тип={block.type}")
+        
         visited: Set[str] = set()
         
-        # Генерируем START блоки и их цепочки
-        print(f"DEBUG: Генерация START блоков. Найдено: {len(start_blocks)}, visited: {len(visited)}")
-        for start_block in start_blocks:
-            print(f"DEBUG: Обработка START блока {start_block.id}, visited: {start_block.id in visited}")
-            if start_block.id in visited:
+        # Генерируем блоки в порядке номеров
+        # Для START блоков генерируем label без отступа, для остальных - с отступом
+        for block_id, level, sublevel in blocks_to_generate:
+            if block_id in visited:
                 continue
             
-            # Пробуем разные варианты ключей для label
-            from renpy_node_editor.core.generator.blocks import safe_get_str
-            start_label = safe_get_str(start_block.params, "label", "") or safe_get_str(start_block.params, "Имя метки (label):", "")
-            print(f"DEBUG: START блок {start_block.id}, label='{start_label}', params keys: {list(start_block.params.keys())}")
-            # Если у START блока нет label'а, пропускаем его, но все равно обрабатываем связанные блоки
-            if not start_label:
-                print(f"DEBUG: START блок {start_block.id} без label, пропускаем генерацию label")
-                # START блок без label - генерируем только связанные блоки
-                visited.add(start_block.id)
-                visited_for_chain = set()
-                visited_for_chain.add(start_block.id)
-                next_blocks_with_dist = connections_map.get(start_block.id, [])
-                for next_id, _ in next_blocks_with_dist:
-                    if next_id not in visited_for_chain:
-                        chain_code = generate_block_chain(
-                            scene, next_id, connections_map, visited_for_chain, INDENT, 
-                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
-                            generated_labels=generated_labels, all_possible_labels=all_possible_labels
-                        )
-                        if chain_code:
-                            lines.append(chain_code)
-                visited.update(visited_for_chain)
+            block = scene.find_block(block_id)
+            if not block:
                 continue
             
-            # Генерируем label для START блока (всегда, если label есть)
-            # НЕ проверяем generated_labels - label должен генерироваться в каждой сцене, где он есть
-            print(f"DEBUG: Генерация label для START блока {start_block.id} с label '{start_label}'")
-            code = generate_block(start_block, "", char_name_map, project_scenes, generated_labels, all_possible_labels)
-            print(f"DEBUG: Сгенерированный код для START блока: {repr(code)}")
-            if code:
-                lines.append(code)
-                generated_labels.add(start_label)
-                print(f"DEBUG: Label '{start_label}' добавлен в generated_labels и в lines")
+            # Пропускаем IMAGE и CHARACTER блоки - они в секции определений
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+                continue
+            
+            # Определяем отступ: для START блока - без отступа (генерирует label), для остальных - с отступом
+            indent = "" if block.type == BlockType.START else INDENT
+            
+            # Для START блока генерируем label
+            if block.type == BlockType.START:
+                from renpy_node_editor.core.generator.blocks import safe_get_str
+                start_label = safe_get_str(block.params, "label", "") or safe_get_str(block.params, "Имя метки (label):", "")
+                if start_label:
+                    print(f"DEBUG: Генерация label для START блока {block_id} с label '{start_label}'")
+                    code = generate_block(block, indent, char_name_map, project_scenes, generated_labels, all_possible_labels)
+                    if code:
+                        lines.append(code)
+                        generated_labels.add(start_label)
+                        print(f"DEBUG: Label '{start_label}' добавлен в generated_labels")
+                    visited.add(block_id)
+                    continue
+            
+            # Для остальных блоков генерируем код с отступом
+            # Но для IF/WHILE/FOR нужно обрабатывать их ветки отдельно
+            if block.type in (BlockType.IF, BlockType.WHILE, BlockType.FOR):
+                # Эти блоки обрабатываются через generate_block_chain с рекурсией для веток
+                # Но visited уже содержит обработанные блоки, поэтому не будет дублирования
+                code = generate_block_chain(
+                    scene, block_id, connections_map, visited, indent,
+                    char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
+                    generated_labels=generated_labels, all_possible_labels=all_possible_labels
+                )
+                if code:
+                    lines.append(code)
             else:
-                print(f"DEBUG: generate_block вернул пустую строку для START блока {start_block.id}")
+                # Обычные блоки - просто генерируем
+                print(f"DEBUG: Генерация блока {block_id} типа {block.type} (level={level}, sublevel={sublevel})")
+                code = generate_block(block, indent, char_name_map, project_scenes, generated_labels, all_possible_labels)
+                if code:
+                    lines.append(code)
             
-            visited.add(start_block.id)
-            
-            # Генерируем цепочку блоков после START блока
-            visited_for_chain = set()
-            visited_for_chain.add(start_block.id)
-            
-            # Получаем блоки, связанные с START блоком
-            # Обрабатываем все связанные блоки в порядке расстояния (ближайшие первыми)
-            next_blocks_with_dist = connections_map.get(start_block.id, [])
-            print(f"DEBUG: START блок {start_block.id} имеет {len(next_blocks_with_dist)} связанных блоков")
-            for next_id, dist in next_blocks_with_dist:
-                print(f"  Связанный блок: {next_id}, расстояние: {dist}")
-            
-            # Обрабатываем все выходы последовательно (в порядке расстояния)
-            for next_id, dist in next_blocks_with_dist:
-                if next_id not in visited_for_chain:
-                    print(f"DEBUG: Генерация цепочки для блока {next_id} после START блока {start_block.id} (расстояние: {dist})")
-                    chain_code = generate_block_chain(
-                        scene, next_id, connections_map, visited_for_chain, INDENT, 
-                        char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
-                        generated_labels=generated_labels, all_possible_labels=all_possible_labels
-                    )
-                    print(f"DEBUG: Сгенерированный код цепочки для блока {next_id}: {repr(chain_code[:100]) if chain_code else 'пусто'}")
-                    if chain_code:
-                        lines.append(chain_code)
-                else:
-                    print(f"DEBUG: Блок {next_id} уже в visited_for_chain, пропускаем")
+            visited.add(block_id)
             
             # Отмечаем все обработанные блоки как visited
             print(f"DEBUG: Обработано блоков в цепочке после START {start_block.id}: {len(visited_for_chain)}")
