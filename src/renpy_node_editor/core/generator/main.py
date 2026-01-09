@@ -61,11 +61,12 @@ def normalize_variable_name(name: str) -> str:
     return normalized
 
 
-def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, str]] = None) -> str:
+def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, str]] = None, project_scenes: Optional[list] = None) -> str:
     """Generate code for a single block"""
-    # START блок не генерирует код - это просто точка входа
+    # START блок генерирует jump/call если указан target_label
     if block.type == BlockType.START:
-        return ""
+        from renpy_node_editor.core.generator.blocks import generate_start
+        return generate_start(block, indent, project_scenes)
     
     # Special handling for blocks that need connection traversal
     if block.type in (BlockType.IF, BlockType.WHILE, BlockType.FOR):
@@ -136,7 +137,8 @@ def generate_block_chain(
     indent: str,
     char_name_map: Optional[Dict[str, str]] = None,
     reverse_connections: Optional[Dict[str, Set[str]]] = None,
-    recursive: bool = True
+    recursive: bool = True,
+    project_scenes: Optional[list] = None
 ) -> str:
     """
     Generate code for a block and optionally its chain.
@@ -179,12 +181,12 @@ def generate_block_chain(
             
             if len(next_blocks) >= 1:
                 true_branch = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
                 )
             
             if len(next_blocks) >= 2:
                 false_branch = generate_block_chain(
-                    scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
+                    scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_if
@@ -198,7 +200,7 @@ def generate_block_chain(
             
             if next_blocks:
                 loop_body = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_while
@@ -213,7 +215,7 @@ def generate_block_chain(
             
             if next_blocks:
                 loop_body = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_for
@@ -223,8 +225,14 @@ def generate_block_chain(
         if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
             # Пропускаем генерацию, но продолжаем цепочку
             pass
+        elif block.type == BlockType.START:
+            # START блоки генерируют jump/call если указан target_label
+            code = generate_block(block, indent, char_name_map, project_scenes)
+            if code:
+                lines.append(code)
+            # Продолжаем цепочку после START блока
         else:
-            code = generate_block(block, indent, char_name_map)
+            code = generate_block(block, indent, char_name_map, project_scenes)
             if code:
                 lines.append(code)
         
@@ -250,7 +258,7 @@ def generate_block_chain(
                                 continue
                     
                     next_code = generate_block_chain(
-                        scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive
+                        scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes
                     )
                     if next_code:
                         lines.append(next_code)
@@ -258,7 +266,7 @@ def generate_block_chain(
     return "".join(lines)
 
 
-def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None) -> str:
+def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None, project_scenes: Optional[list] = None) -> str:
     """Generate code for a scene"""
     lines: List[str] = []
     
@@ -275,7 +283,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
     if not start_blocks:
         indent = INDENT
         for block in sorted(scene.blocks, key=lambda b: (b.y, b.x)):
-            code = generate_block(block, indent, char_name_map)
+            code = generate_block(block, indent, char_name_map, project_scenes)
             if code:
                 lines.append(code)
     else:
@@ -433,20 +441,30 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if not block:
                 continue
             
-            # START, IMAGE, CHARACTER блоки не генерируются здесь
-            if block.type in (BlockType.START, BlockType.IMAGE, BlockType.CHARACTER):
+            # START блоки генерируются отдельно (могут иметь jump/call)
+            # IMAGE, CHARACTER блоки не генерируются здесь
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
                 visited.add(block_id)
                 continue
             
-            code = generate_block(block, INDENT, char_name_map)
+            # START блоки генерируются, если у них есть target_label
+            if block.type == BlockType.START:
+                code = generate_block(block, INDENT, char_name_map, project_scenes)
+                if code:
+                    lines.append(code)
+                visited.add(block_id)
+                continue
+            
+            code = generate_block(block, INDENT, char_name_map, project_scenes)
             if code:
                 lines.append(code)
             visited.add(block_id)
         
         # Обрабатываем блоки без соединений
         for block in scene.blocks:
-            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START):
-                code = generate_block(block, INDENT, char_name_map)
+            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
+                # START блоки тоже обрабатываем, если они не были обработаны
+                code = generate_block(block, INDENT, char_name_map, project_scenes)
                 if code:
                     lines.append(code)
     
@@ -639,6 +657,6 @@ def generate_renpy_script(project: Project) -> str:
     
     # Generate scenes
     for scene in project.scenes:
-        lines.append(generate_scene(scene, char_name_map))
+        lines.append(generate_scene(scene, char_name_map, project.scenes))
     
     return "".join(lines)

@@ -210,6 +210,30 @@ def generate_return(block: Block, indent: str) -> str:
     return f"{indent}return\n"
 
 
+def generate_start(block: Block, indent: str, project_scenes: Optional[list] = None) -> str:
+    """Generate start block with jump/call to target label"""
+    transition_type = safe_get_str(block.params, "transition_type", "jump").lower()
+    target_label = safe_get_str(block.params, "target_label", "")
+    
+    # Если лейбл не указан, не генерируем код
+    if not target_label:
+        return ""
+    
+    # Проверяем, что лейбл существует в проекте (если передан список сцен)
+    if project_scenes:
+        label_exists = any(scene.label == target_label for scene in project_scenes)
+        if not label_exists:
+            # Если лейбл не найден, все равно генерируем код (может быть внешний лейбл)
+            pass
+    
+    # Генерируем jump или call
+    if transition_type == "call":
+        return f"{indent}call {target_label}\n"
+    else:
+        # По умолчанию используем jump
+        return f"{indent}jump {target_label}\n"
+
+
 def generate_scene(block: Block, indent: str) -> str:
     """Generate scene statement"""
     bg = safe_get_str(block.params, "background", "")

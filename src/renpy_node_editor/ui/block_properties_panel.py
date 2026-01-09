@@ -272,6 +272,11 @@ class BlockPropertiesPanel(QWidget):
             self._add_file_field("path", "Путь к файлу:", "", "image")
         elif block_type == BlockType.LABEL:
             self._add_text_field("label", "Имя метки:", "")
+        elif block_type == BlockType.START:
+            # Добавляем поле для выбора лейбла из проекта
+            self._add_scene_label_field("target_label", "Переход на метку:", "")
+            # Добавляем выбор типа перехода: jump или call
+            self._add_combo_field("transition_type", "Тип перехода:", ["jump", "call"], "jump")
         elif block_type == BlockType.SCENE:
             # Фон может быть "black", "white" или имя изображения (например, "bg room")
             # Добавляем поле с кнопкой выбора файла
@@ -819,6 +824,52 @@ class BlockPropertiesPanel(QWidget):
                     return controller.project
             parent = parent.parent()
         return None
+    
+    def _get_scene_labels(self) -> list[str]:
+        """Получить список лейблов из всех сцен проекта"""
+        project = self._get_project()
+        if not project:
+            return []
+        
+        labels = []
+        for scene in project.scenes:
+            if scene.label and scene.label not in labels:
+                labels.append(scene.label)
+        
+        return sorted(labels)
+    
+    def _add_scene_label_field(self, key: str, label: str, default: str = "") -> None:
+        """Add a scene label field with combo box showing all scene labels from project"""
+        label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
+        
+        # Combo box с лейблами из проекта
+        combo = QComboBox(self)
+        combo.setEditable(True)  # Разрешаем ввод произвольного лейбла
+        combo.addItem("")  # Пустой вариант
+        
+        # Добавляем лейблы из всех сцен проекта
+        scene_labels = self._get_scene_labels()
+        if scene_labels:
+            combo.addItem("--- Лейблы из проекта ---")
+            for label_name in scene_labels:
+                combo.addItem(label_name)
+        
+        value = self.current_block.params.get(key, default) if self.current_block else default
+        current_text = str(value) if value else ""
+        
+        index = combo.findText(current_text)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        else:
+            combo.setCurrentText(current_text)
+        
+        combo.setToolTip(tooltip)
+        combo.setStyleSheet(self._get_combo_style())
+        
+        self._param_widgets[key] = combo
     
     def _get_defined_images(self) -> Dict[str, str]:
         """Получить список определенных изображений из проекта"""
