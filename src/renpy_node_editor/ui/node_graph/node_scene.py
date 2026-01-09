@@ -160,7 +160,8 @@ class NodeScene(QGraphicsScene):
             self._scene_model = scene_in_project if scene_in_project else scene
             
             # Создаем блоки
-            for block in scene.blocks:
+            # ВАЖНО: используем блоки из _scene_model (объекта из проекта), а не из переданного scene
+            for block in self._scene_model.blocks:
                 try:
                     node_item = self._create_node_item_for_block(block)
                     # Включаем обратно флаги для новых элементов

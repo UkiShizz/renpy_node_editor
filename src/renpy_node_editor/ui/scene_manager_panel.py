@@ -207,8 +207,14 @@ class SceneManagerPanel(QWidget):
         self._project.add_scene(new_scene)
         self._refresh_scenes_list()
         
+        # ВАЖНО: получаем объект Scene из проекта, а не используем созданный объект
+        # Это гарантирует, что мы используем тот же объект, что находится в project.scenes
+        scene_from_project = self._project.find_scene(new_scene.id)
+        if not scene_from_project:
+            scene_from_project = new_scene
+        
         # Устанавливаем новую сцену как текущую
-        self._current_scene = new_scene
+        self._current_scene = scene_from_project
         
         # Сохраняем проект после добавления сцены
         # Получаем контроллер через родительское окно
@@ -219,8 +225,8 @@ class SceneManagerPanel(QWidget):
             except Exception:
                 pass  # Игнорируем ошибки сохранения
         
-        # Автоматически выбираем новую сцену
-        self.scene_selected.emit(new_scene)
+        # Автоматически выбираем новую сцену (используем объект из проекта)
+        self.scene_selected.emit(scene_from_project)
     
     def _on_delete_scene(self) -> None:
         """Удалить выбранную сцену"""
