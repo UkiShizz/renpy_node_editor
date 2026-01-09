@@ -574,6 +574,7 @@ class NodeScene(QGraphicsScene):
                 }
             """)
             delete_action = menu.addAction("🗑️ Удалить блок")
+            delete_action.setToolTip("Удалить выбранный блок из сцены")
             delete_action.triggered.connect(lambda: self.delete_selected_blocks())
             menu.exec(event.screenPos())
         elif isinstance(item, ConnectionItem):
@@ -597,5 +598,6 @@ class NodeScene(QGraphicsScene):
                 }
             """)
             delete_action = menu.addAction("🗑️ Удалить связь")
+            delete_action.setToolTip("Удалить связь между блоками")
             delete_action.triggered.connect(lambda: self.delete_connection(item))
             menu.exec(event.screenPos())

@@ -12,7 +12,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType
-from renpy_node_editor.ui.tooltips import get_parameter_tooltip
+from renpy_node_editor.ui.tooltips import (
+    get_parameter_tooltip,
+    get_transition_tooltip,
+    get_position_tooltip,
+    get_layer_tooltip,
+    get_background_tooltip,
+)
 
 # Стандартные переходы Ren'Py (https://www.renpy.org/doc/html/transitions.html)
 RENPY_TRANSITIONS = [
@@ -337,39 +343,24 @@ class BlockPropertiesPanel(QWidget):
             combo.setCurrentText(current_text)
         
         combo.setToolTip(tooltip)
-        combo.setStyleSheet("""
-            QComboBox {
-                background-color: #2A2A2A;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-                color: #E0E0E0;
-                padding: 4px;
-                min-height: 20px;
-            }
-            QComboBox:hover {
-                border-color: #4A90E2;
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 6px solid #E0E0E0;
-                width: 0;
-                height: 0;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #2A2A2A;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-                color: #E0E0E0;
-                selection-background-color: #4A90E2;
-                selection-color: #FFFFFF;
-            }
-        """)
+        combo.setStyleSheet(self._get_combo_style())
+        
+        # Добавляем tooltips к пунктам фона
+        for i in range(combo.count()):
+            item_text = combo.itemText(i)
+            if item_text:
+                item_tooltip = get_background_tooltip(item_text)
+                combo.setItemData(i, item_tooltip, Qt.ToolTipRole)
+        
+        # Подключаем сигнал для отображения tooltip при наведении на пункты
+        def on_highlighted(index: int) -> None:
+            tooltip_text = combo.itemData(index, Qt.ToolTipRole)
+            if tooltip_text:
+                combo.setToolTip(str(tooltip_text))
+            else:
+                combo.setToolTip(tooltip)
+        
+        combo.highlighted.connect(on_highlighted)
         
         self._param_widgets[key] = combo
         bg_container.addWidget(combo, 1)
@@ -503,32 +494,9 @@ class BlockPropertiesPanel(QWidget):
         self._param_widgets[key] = checkbox
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, checkbox)
     
-    def _add_combo_field(self, key: str, label: str, options: list[str], default: str = "") -> None:
-        """Add a combo box (dropdown) for a parameter with predefined options."""
-        label_widget = QLabel(label, self)
-        tooltip = get_parameter_tooltip(key)
-        label_widget.setToolTip(tooltip)
-        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
-        
-        combo = QComboBox(self)
-        combo.setEditable(True)  # Разрешаем ввод своего значения
-        combo.addItem("")  # Пустой вариант для опциональных полей
-        combo.addItems(options)
-        
-        # Устанавливаем текущее значение
-        value = self.current_block.params.get(key, default) if self.current_block else default
-        current_text = str(value) if value else ""
-        
-        # Ищем в списке
-        index = combo.findText(current_text)
-        if index >= 0:
-            combo.setCurrentIndex(index)
-        else:
-            # Если значения нет в списке, устанавливаем его как текущий текст
-            combo.setCurrentText(current_text)
-        
-        combo.setToolTip(tooltip)
-        combo.setStyleSheet("""
+    def _get_combo_style(self) -> str:
+        """Возвращает стиль для QComboBox (вынесено для переиспользования)"""
+        return """
             QComboBox {
                 background-color: #2A2A2A;
                 border: 1px solid #3A3A3A;
@@ -560,7 +528,61 @@ class BlockPropertiesPanel(QWidget):
                 selection-background-color: #4A90E2;
                 selection-color: #FFFFFF;
             }
-        """)
+        """
+    
+    def _add_combo_field(self, key: str, label: str, options: list[str], default: str = "") -> None:
+        """Add a combo box (dropdown) for a parameter with predefined options."""
+        label_widget = QLabel(label, self)
+        tooltip = get_parameter_tooltip(key)
+        label_widget.setToolTip(tooltip)
+        self.properties_layout.insertWidget(self.properties_layout.count() - 1, label_widget)
+        
+        combo = QComboBox(self)
+        combo.setEditable(True)  # Разрешаем ввод своего значения
+        combo.addItem("")  # Пустой вариант для опциональных полей
+        
+        # Добавляем опции с tooltips
+        for option in options:
+            combo.addItem(option)
+            # Определяем tooltip в зависимости от типа поля
+            if key == "with_transition" or key == "transition":
+                item_tooltip = get_transition_tooltip(option)
+            elif key == "at":
+                item_tooltip = get_position_tooltip(option)
+            elif key == "layer":
+                item_tooltip = get_layer_tooltip(option)
+            elif key == "background":
+                item_tooltip = get_background_tooltip(option)
+            else:
+                item_tooltip = f"{option}"
+            
+            # Устанавливаем tooltip через setItemData
+            combo.setItemData(combo.count() - 1, item_tooltip, Qt.ToolTipRole)
+        
+        # Устанавливаем текущее значение
+        value = self.current_block.params.get(key, default) if self.current_block else default
+        current_text = str(value) if value else ""
+        
+        # Ищем в списке
+        index = combo.findText(current_text)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        else:
+            # Если значения нет в списке, устанавливаем его как текущий текст
+            combo.setCurrentText(current_text)
+        
+        combo.setToolTip(tooltip)
+        combo.setStyleSheet(self._get_combo_style())
+        
+        # Подключаем сигнал для отображения tooltip при наведении на пункты
+        def on_highlighted(index: int) -> None:
+            tooltip_text = combo.itemData(index, Qt.ToolTipRole)
+            if tooltip_text:
+                combo.setToolTip(str(tooltip_text))
+            else:
+                combo.setToolTip(tooltip)
+        
+        combo.highlighted.connect(on_highlighted)
         
         self._param_widgets[key] = combo
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, combo)
