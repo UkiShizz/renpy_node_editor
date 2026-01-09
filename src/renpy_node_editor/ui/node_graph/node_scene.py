@@ -154,7 +154,10 @@ class NodeScene(QGraphicsScene):
             
             # Устанавливаем новую модель ПОСЛЕ очистки
             self._project = project
-            self._scene_model = scene
+            # ВАЖНО: используем объект Scene из проекта, а не переданный объект
+            # Это гарантирует, что все изменения сохраняются в правильный объект
+            scene_in_project = project.find_scene(scene.id) if project else None
+            self._scene_model = scene_in_project if scene_in_project else scene
             
             # Создаем блоки
             for block in scene.blocks:
@@ -534,10 +537,13 @@ class NodeScene(QGraphicsScene):
                     )
                     # Добавляем connection в правильный объект Scene из проекта
                     scene_in_project.add_connection(connection)
-                    # Также обновляем локальную ссылку
-                    if self._scene_model.id == scene_in_project.id:
-                        self._scene_model = scene_in_project
+                    # ВАЖНО: обновляем локальную ссылку на объект из проекта
+                    # Это гарантирует, что _scene_model всегда указывает на объект из project.scenes
+                    self._scene_model = scene_in_project
                     self._drag_connection.connection_id = connection_id
+                    
+                    # Отладочный вывод для проверки
+                    print(f"DEBUG: Connection добавлен. Scene ID: {scene_in_project.id}, Connection ID: {connection_id}, Connections count: {len(scene_in_project.connections)}")
                 
                 self._drag_connection.set_dst_port(item)
                 self._drag_src_port.add_connection(self._drag_connection)
