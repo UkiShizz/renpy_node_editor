@@ -183,15 +183,6 @@ class NodeScene(QGraphicsScene):
             # Это нужно для правильного восстановления connections
             self._ensure_ports_in_model()
             
-            # Создаем связи
-            try:
-                print(f"DEBUG: Вызов _create_connections. _is_loading={self._is_loading}, _scene_model={self._scene_model is not None}")
-                self._create_connections()
-            except Exception as e:
-                import traceback
-                print(f"DEBUG: Ошибка в _create_connections: {e}")
-                traceback.print_exc()
-            
             # Подключаем обработчик selectionChanged обратно ПОСЛЕ создания всех элементов
             try:
                 self.selectionChanged.connect(self._on_selection_changed)
@@ -211,6 +202,16 @@ class NodeScene(QGraphicsScene):
             except Exception:
                 pass
             self._is_loading = False
+            
+            # ВАЖНО: создаем связи ПОСЛЕ установки _is_loading = False
+            # Это нужно, чтобы _create_connections() не выходил сразу из-за проверки _is_loading
+            try:
+                print(f"DEBUG: Вызов _create_connections. _is_loading={self._is_loading}, _scene_model={self._scene_model is not None}")
+                self._create_connections()
+            except Exception as e:
+                import traceback
+                print(f"DEBUG: Ошибка в _create_connections: {e}")
+                traceback.print_exc()
 
     def _create_node_item_for_block(self, block: Block) -> NodeItem:
         item = NodeItem(block)
