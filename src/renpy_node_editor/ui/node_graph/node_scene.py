@@ -185,9 +185,12 @@ class NodeScene(QGraphicsScene):
             
             # Создаем связи
             try:
+                print(f"DEBUG: Вызов _create_connections. _is_loading={self._is_loading}, _scene_model={self._scene_model is not None}")
                 self._create_connections()
-            except Exception:
-                pass
+            except Exception as e:
+                import traceback
+                print(f"DEBUG: Ошибка в _create_connections: {e}")
+                traceback.print_exc()
             
             # Подключаем обработчик selectionChanged обратно ПОСЛЕ создания всех элементов
             try:
@@ -289,7 +292,12 @@ class NodeScene(QGraphicsScene):
     
     def _create_connections(self) -> None:
         """Создать визуальные связи из модели"""
-        if not self._scene_model or self._is_loading:
+        print(f"DEBUG: _create_connections вызван. _scene_model={self._scene_model is not None}, _is_loading={self._is_loading}")
+        if not self._scene_model:
+            print("DEBUG: _create_connections: _scene_model is None, выходим")
+            return
+        if self._is_loading:
+            print("DEBUG: _create_connections: _is_loading is True, выходим")
             return
         
         # Отладочный вывод
