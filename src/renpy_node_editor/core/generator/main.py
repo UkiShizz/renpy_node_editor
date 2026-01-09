@@ -270,21 +270,56 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if code:
                 lines.append(code)
     else:
-        # Используем одно общее множество visited для всех цепочек
-        # чтобы избежать дублирования блоков
+        # Используем топологическую сортировку для правильного порядка обработки
+        # Обрабатываем блоки в несколько проходов, чтобы правильно обработать параллельные ветки
         visited: Set[str] = set()
-        for start_block in start_blocks:
-            if start_block.id not in visited:
-                code = generate_block_chain(
-                    scene, start_block.id, connections_map, visited, INDENT, char_name_map, reverse_connections
-                )
-                if code:
-                    lines.append(code)
+        processed: Set[str] = set()
+        
+        # Многопроходная обработка: обрабатываем блоки, пока есть что обрабатывать
+        max_iterations = len(scene.blocks) * 2  # Защита от бесконечного цикла
+        iteration = 0
+        
+        while iteration < max_iterations:
+            iteration += 1
+            progress_made = False
+            
+            # Пытаемся обработать все стартовые блоки
+            for start_block in start_blocks:
+                if start_block.id not in processed:
+                    code = generate_block_chain(
+                        scene, start_block.id, connections_map, visited, INDENT, char_name_map, reverse_connections
+                    )
+                    if code:
+                        lines.append(code)
+                        processed.add(start_block.id)
+                        progress_made = True
+            
+            # Пытаемся обработать блоки, которые еще не обработаны, но все их входы готовы
+            for block in scene.blocks:
+                if block.id not in processed and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
+                    # Проверяем, все ли входы обработаны
+                    if reverse_connections:
+                        input_blocks = reverse_connections.get(block.id, set())
+                        if input_blocks:
+                            if not all(inp_id in processed for inp_id in input_blocks):
+                                continue
+                    
+                    # Все входы обработаны - можно обработать этот блок
+                    code = generate_block_chain(
+                        scene, block.id, connections_map, visited, INDENT, char_name_map, reverse_connections
+                    )
+                    if code:
+                        lines.append(code)
+                        processed.add(block.id)
+                        progress_made = True
+            
+            if not progress_made:
+                break
         
         # Add unprocessed blocks (блоки без соединений)
         # IMAGE и CHARACTER блоки не генерируются здесь - они в секции определений
         for block in scene.blocks:
-            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
+            if block.id not in processed and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
                 code = generate_block(block, INDENT, char_name_map)
                 if code:
                     lines.append(code)
