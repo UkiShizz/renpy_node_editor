@@ -582,10 +582,6 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             
             visited.add(block_id)
             
-            # Отмечаем все обработанные блоки как visited
-            print(f"DEBUG: Обработано блоков в цепочке после START {start_block.id}: {len(visited_for_chain)}")
-            visited.update(visited_for_chain)
-            
             # НЕ добавляем return автоматически в конце label'ов
             # return должен быть только один раз в конце label start:
             # Пользователь может добавить return через RETURN блок, если нужно
