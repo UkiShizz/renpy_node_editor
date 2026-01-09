@@ -275,11 +275,46 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
             if code:
                 lines.append(code)
     else:
-        # Используем простой подход: обрабатываем блоки в топологическом порядке
-        # но при разветвлении обрабатываем все параллельные ветки сразу
+        # Простой обход в глубину (DFS) - обрабатываем все параллельные ветки последовательно
         visited: Set[str] = set()
         
-        def process_chain_until_merge(block_id: str) -> None:
+        def process_block_dfs(block_id: str) -> None:
+            """Рекурсивно обрабатывает блок и все его потомки"""
+            if block_id in visited:
+                return
+            
+            # Проверяем, все ли входы блока обработаны (для точек слияния)
+            if reverse_connections:
+                input_blocks = reverse_connections.get(block_id, set())
+                if len(input_blocks) > 1:
+                    # Это точка слияния - проверяем, все ли входы обработаны
+                    if not all(inp_id in visited for inp_id in input_blocks):
+                        return
+            
+            # Генерируем код для этого блока
+            code = generate_block_chain(
+                scene, block_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
+            )
+            if code:
+                lines.append(code)
+            
+            # Получаем все выходы этого блока (без сортировки)
+            next_blocks_with_dist = connections_map.get(block_id, [])
+            
+            if len(next_blocks_with_dist) > 1:
+                # Это разветвление - обрабатываем все параллельные ветки последовательно
+                # Без сортировки - просто в том порядке, в котором они есть
+                for next_id, _ in next_blocks_with_dist:
+                    if next_id not in visited:
+                        # Обрабатываем всю цепочку этой ветки рекурсивно
+                        process_chain_dfs(next_id)
+            elif len(next_blocks_with_dist) == 1:
+                # Один выход - обрабатываем его рекурсивно
+                next_id = next_blocks_with_dist[0][0]
+                if next_id not in visited:
+                    process_block_dfs(next_id)
+        
+        def process_chain_dfs(block_id: str) -> None:
             """Обрабатывает цепочку блоков до точки слияния или разветвления"""
             current_id = block_id
             
@@ -304,20 +339,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                 next_blocks_with_dist = connections_map.get(current_id, [])
                 
                 if len(next_blocks_with_dist) > 1:
-                    # Это разветвление - обрабатываем все параллельные ветки рекурсивно
-                    # Сортируем по позиции (сверху вниз, слева направо)
-                    next_blocks_sorted = sorted(
-                        next_blocks_with_dist,
-                        key=lambda x: (
-                            next((b.y for b in scene.blocks if b.id == x[0]), 0),
-                            next((b.x for b in scene.blocks if b.id == x[0]), 0)
-                        )
-                    )
-                    
-                    # Обрабатываем каждую параллельную ветку полностью
-                    for next_id, _ in next_blocks_sorted:
-                        if next_id not in visited:
-                            process_chain_until_merge(next_id)
+                    # Это разветвление - обрабатываем его рекурсивно
+                    process_block_dfs(current_id)
                     break
                 elif len(next_blocks_with_dist) == 1:
                     # Один выход - продолжаем цепочку
@@ -326,47 +349,12 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                     # Нет выходов - конец цепочки
                     break
         
-        # Получаем топологически отсортированный список блоков
-        sorted_block_ids = topological_sort_blocks(scene, connections_map, reverse_connections)
+        # Обрабатываем все стартовые блоки
+        for start_block in start_blocks:
+            if start_block.id not in visited:
+                process_block_dfs(start_block.id)
         
-        # Обрабатываем блоки в топологическом порядке
-        for block_id in sorted_block_ids:
-            if block_id in visited:
-                continue
-            
-            # Проверяем, все ли входы блока обработаны
-            if reverse_connections:
-                input_blocks = reverse_connections.get(block_id, set())
-                if input_blocks:
-                    if not all(inp_id in visited for inp_id in input_blocks):
-                        continue
-            
-            # Генерируем код для этого блока
-            code = generate_block_chain(
-                scene, block_id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
-            )
-            if code:
-                lines.append(code)
-            
-            # Если этот блок разветвляется, обрабатываем все параллельные ветки полностью
-            next_blocks_with_dist = connections_map.get(block_id, [])
-            if len(next_blocks_with_dist) > 1:
-                # Сортируем по позиции (сверху вниз, слева направо)
-                next_blocks_sorted = sorted(
-                    next_blocks_with_dist,
-                    key=lambda x: (
-                        next((b.y for b in scene.blocks if b.id == x[0]), 0),
-                        next((b.x for b in scene.blocks if b.id == x[0]), 0)
-                    )
-                )
-                
-                # Обрабатываем каждую параллельную ветку полностью до точки слияния
-                for next_id, _ in next_blocks_sorted:
-                    if next_id not in visited:
-                        # Обрабатываем всю цепочку этой ветки до точки слияния
-                        process_chain_until_merge(next_id)
-        
-        # Многопроходная обработка для оставшихся блоков
+        # Многопроходная обработка для оставшихся блоков (точки слияния)
         max_iterations = len(scene.blocks) * 2
         for iteration in range(max_iterations):
             progress_made = False
@@ -381,11 +369,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None)
                                 continue
                     
                     # Все входы обработаны - обрабатываем блок
-                    code = generate_block_chain(
-                        scene, block.id, connections_map, visited, INDENT, char_name_map, reverse_connections, recursive=False
-                    )
-                    if code:
-                        lines.append(code)
+                    process_block_dfs(block.id)
                     progress_made = True
             
             if not progress_made:
