@@ -447,9 +447,47 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         blocks_to_generate.sort(key=lambda x: (x[1], x[2]))  # Сортируем по level, затем sublevel
         
         visited: Set[str] = set()
-        current_indent = INDENT if not has_start_blocks_with_labels else INDENT  # Отступ для блоков после label
-        in_start_label = False  # Флаг, что мы внутри label START блока
         
+        # Генерируем START блоки и их цепочки
+        for start_block in start_blocks:
+            if start_block.id in visited:
+                continue
+            
+            start_label = start_block.params.get("label", "")
+            if not start_label:
+                continue
+            
+            # Проверяем, не была ли эта метка уже сгенерирована
+            if start_label in generated_labels:
+                continue
+            
+            # Генерируем label для START блока
+            code = generate_block(start_block, "", char_name_map, project_scenes)
+            if code:
+                lines.append(code)
+                generated_labels.add(start_label)
+            
+            visited.add(start_block.id)
+            
+            # Генерируем цепочку блоков после START блока
+            visited_for_chain = set()
+            visited_for_chain.add(start_block.id)
+            
+            # Получаем блоки, связанные с START блоком
+            next_blocks_with_dist = connections_map.get(start_block.id, [])
+            for next_id, _ in next_blocks_with_dist:
+                if next_id not in visited_for_chain:
+                    chain_code = generate_block_chain(
+                        scene, next_id, connections_map, visited_for_chain, INDENT, 
+                        char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                    )
+                    if chain_code:
+                        lines.append(chain_code)
+            
+            # Отмечаем все обработанные блоки как visited
+            visited.update(visited_for_chain)
+        
+        # Генерируем оставшиеся блоки (не связанные с START блоками)
         for block_id, _, _ in blocks_to_generate:
             if block_id in visited:
                 continue
@@ -458,29 +496,13 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             if not block:
                 continue
             
-            # START блоки генерируют свой собственный label
-            # IMAGE, CHARACTER блоки не генерируются здесь
-            if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+            # START блоки, IMAGE, CHARACTER блоки уже обработаны
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START):
                 visited.add(block_id)
                 continue
             
-            # START блоки генерируются на верхнем уровне (без отступа), если у них есть label
-            if block.type == BlockType.START:
-                # START блоки генерируют label на верхнем уровне, без отступа
-                start_label = block.params.get("label", "")
-                # Проверяем, не была ли эта метка уже сгенерирована
-                if start_label and start_label not in generated_labels:
-                    code = generate_block(block, "", char_name_map, project_scenes)
-                    if code:
-                        lines.append(code)
-                        generated_labels.add(start_label)
-                        in_start_label = True  # Теперь мы внутри label START блока
-                visited.add(block_id)
-                continue
-            
-            # Блоки после START блока генерируются с отступом внутри label START блока
-            # Или с отступом внутри label сцены, если нет START блоков
-            code = generate_block(block, current_indent, char_name_map, project_scenes)
+            # Генерируем блок с отступом
+            code = generate_block(block, INDENT, char_name_map, project_scenes)
             if code:
                 lines.append(code)
             visited.add(block_id)
@@ -690,12 +712,42 @@ def generate_renpy_script(project: Project) -> str:
     # Если нет метки start, создаем её в начале (после определений, перед сценами)
     # Это стандартная практика Ren'Py - метка start обычно идет в начале файла
     if not has_start_label and project.scenes:
-        # Используем первую сцену как точку входа
-        lines.append("\n# Main entry point\n")
-        lines.append("label start:\n")
+        # Используем первый START блок из первой сцены как точку входа, если он есть
         first_scene = project.scenes[0]
-        lines.append(f"    jump {first_scene.label}\n\n")
-        generated_labels.add("start")
+        first_start_block = None
+        for block in first_scene.blocks:
+            if block.type == BlockType.START:
+                first_start_block = block
+                break
+        
+        if first_start_block:
+            # Есть START блок - он сам сгенерирует label
+            pass
+        else:
+            # Нет START блока - создаем стандартный label start с jump к первому START блоку
+            # Ищем первый START блок в любой сцене
+            first_start_in_project = None
+            for scene in project.scenes:
+                for block in scene.blocks:
+                    if block.type == BlockType.START:
+                        start_label = block.params.get("label", "")
+                        if start_label:
+                            first_start_in_project = start_label
+                            break
+                if first_start_in_project:
+                    break
+            
+            if first_start_in_project:
+                lines.append("\n# Main entry point\n")
+                lines.append("label start:\n")
+                lines.append(f"    jump {first_start_in_project}\n\n")
+                generated_labels.add("start")
+            else:
+                # Нет START блоков вообще - создаем пустую метку start
+                lines.append("\n# Main entry point\n")
+                lines.append("label start:\n")
+                lines.append("    return\n\n")
+                generated_labels.add("start")
     elif not has_start_label:
         # Если вообще нет сцен, создаем пустую метку start
         lines.append("\n# Main entry point\n")
