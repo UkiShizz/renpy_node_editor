@@ -61,7 +61,7 @@ def normalize_variable_name(name: str) -> str:
     return normalized
 
 
-def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, str]] = None, project_scenes: Optional[list] = None) -> str:
+def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, str]] = None, project_scenes: Optional[list] = None, generated_labels: Optional[Set[str]] = None) -> str:
     """Generate code for a single block"""
     # START блок генерирует свой собственный label, на который могут ссылаться JUMP и CALL
     if block.type == BlockType.START:
@@ -71,6 +71,15 @@ def generate_block(block: Block, indent: str, char_name_map: Optional[Dict[str, 
     # Special handling for blocks that need connection traversal
     if block.type in (BlockType.IF, BlockType.WHILE, BlockType.FOR):
         return ""  # Handled separately in chain generation
+    
+    # JUMP и CALL блоки проверяют существование целевого label
+    if block.type == BlockType.JUMP:
+        from renpy_node_editor.core.generator.blocks import generate_jump
+        return generate_jump(block, indent, generated_labels)
+    
+    if block.type == BlockType.CALL:
+        from renpy_node_editor.core.generator.blocks import generate_call
+        return generate_call(block, indent, generated_labels)
     
     generator = BLOCK_GENERATORS.get(block.type)
     if generator:
@@ -138,7 +147,8 @@ def generate_block_chain(
     char_name_map: Optional[Dict[str, str]] = None,
     reverse_connections: Optional[Dict[str, Set[str]]] = None,
     recursive: bool = True,
-    project_scenes: Optional[list] = None
+    project_scenes: Optional[list] = None,
+    generated_labels: Optional[Set[str]] = None
 ) -> str:
     """
     Generate code for a block and optionally its chain.
@@ -181,12 +191,12 @@ def generate_block_chain(
             
             if len(next_blocks) >= 1:
                 true_branch = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes, generated_labels=generated_labels
                 )
             
             if len(next_blocks) >= 2:
                 false_branch = generate_block_chain(
-                    scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                    scene, next_blocks[1], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes, generated_labels=generated_labels
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_if
@@ -200,7 +210,7 @@ def generate_block_chain(
             
             if next_blocks:
                 loop_body = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes, generated_labels=generated_labels
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_while
@@ -215,7 +225,7 @@ def generate_block_chain(
             
             if next_blocks:
                 loop_body = generate_block_chain(
-                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                    scene, next_blocks[0], connections_map, visited.copy(), indent + INDENT, char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes, generated_labels=generated_labels
                 )
             
             from renpy_node_editor.core.generator.blocks import generate_for
@@ -227,12 +237,12 @@ def generate_block_chain(
             pass
         elif block.type == BlockType.START:
             # START блоки генерируют jump/call если указан target_label
-            code = generate_block(block, indent, char_name_map, project_scenes)
+            code = generate_block(block, indent, char_name_map, project_scenes, generated_labels)
             if code:
                 lines.append(code)
             # Продолжаем цепочку после START блока
         else:
-            code = generate_block(block, indent, char_name_map, project_scenes)
+            code = generate_block(block, indent, char_name_map, project_scenes, generated_labels)
             if code:
                 lines.append(code)
         
@@ -258,7 +268,7 @@ def generate_block_chain(
                                 continue
                     
                     next_code = generate_block_chain(
-                        scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes
+                        scene, next_id, connections_map, visited, indent, char_name_map, reverse_connections, recursive, project_scenes=project_scenes, generated_labels=generated_labels
                     )
                     if next_code:
                         lines.append(next_code)
@@ -285,14 +295,16 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
     # Отладочный вывод
     print(f"DEBUG generate_scene: Сцена {scene.name}, START блоков найдено: {len(start_blocks)}")
     for sb in start_blocks:
-        label = sb.params.get("label", "")
+        from renpy_node_editor.core.generator.blocks import safe_get_str
+        label = safe_get_str(sb.params, "label", "") or safe_get_str(sb.params, "Имя метки (label):", "")
         print(f"  START блок {sb.id}: label='{label}', params={sb.params}")
     
     # Проверяем, есть ли START блоки с label
     has_start_blocks_with_labels = False
     if start_blocks:
+        from renpy_node_editor.core.generator.blocks import safe_get_str
         for start_block in start_blocks:
-            start_label = start_block.params.get("label", "")
+            start_label = safe_get_str(start_block.params, "label", "") or safe_get_str(start_block.params, "Имя метки (label):", "")
             if start_label:
                 has_start_blocks_with_labels = True
                 break
@@ -310,7 +322,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
                 continue
             print(f"DEBUG: Генерация блока {block.id} типа {block.type}")
-            code = generate_block(block, indent, char_name_map, project_scenes)
+            code = generate_block(block, indent, char_name_map, project_scenes, generated_labels)
             if code:
                 lines.append(code)
     else:
@@ -469,7 +481,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                 continue
             
             # Пробуем разные варианты ключей для label
-            start_label = start_block.params.get("label", "") or start_block.params.get("Имя метки (label):", "")
+            from renpy_node_editor.core.generator.blocks import safe_get_str
+            start_label = safe_get_str(start_block.params, "label", "") or safe_get_str(start_block.params, "Имя метки (label):", "")
             print(f"DEBUG: START блок {start_block.id}, label='{start_label}', params keys: {list(start_block.params.keys())}")
             # Если у START блока нет label'а, пропускаем его, но все равно обрабатываем связанные блоки
             if not start_label:
@@ -483,7 +496,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                     if next_id not in visited_for_chain:
                         chain_code = generate_block_chain(
                             scene, next_id, connections_map, visited_for_chain, INDENT, 
-                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
+                            generated_labels=generated_labels
                         )
                         if chain_code:
                             lines.append(chain_code)
@@ -501,7 +515,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                     if next_id not in visited_for_chain:
                         chain_code = generate_block_chain(
                             scene, next_id, connections_map, visited_for_chain, INDENT, 
-                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                            char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
+                            generated_labels=generated_labels
                         )
                         if chain_code:
                             lines.append(chain_code)
@@ -510,7 +525,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             
             # Генерируем label для START блока
             print(f"DEBUG: Генерация label для START блока {start_block.id} с label '{start_label}'")
-            code = generate_block(start_block, "", char_name_map, project_scenes)
+            code = generate_block(start_block, "", char_name_map, project_scenes, generated_labels)
             print(f"DEBUG: Сгенерированный код для START блока: {repr(code)}")
             if code:
                 lines.append(code)
@@ -531,7 +546,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                 if next_id not in visited_for_chain:
                     chain_code = generate_block_chain(
                         scene, next_id, connections_map, visited_for_chain, INDENT, 
-                        char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes
+                        char_name_map, reverse_connections, recursive=True, project_scenes=project_scenes,
+                        generated_labels=generated_labels
                     )
                     if chain_code:
                         lines.append(chain_code)
@@ -554,7 +570,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
                 continue
             
             # Генерируем блок с отступом
-            code = generate_block(block, INDENT, char_name_map, project_scenes)
+            code = generate_block(block, INDENT, char_name_map, project_scenes, generated_labels)
             if code:
                 lines.append(code)
             visited.add(block_id)
@@ -564,15 +580,16 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
                 # START блоки генерируются на верхнем уровне (без отступа)
                 if block.type == BlockType.START:
-                    start_label = block.params.get("label", "")
+                    from renpy_node_editor.core.generator.blocks import safe_get_str
+                    start_label = safe_get_str(block.params, "label", "") or safe_get_str(block.params, "Имя метки (label):", "")
                     # Проверяем, не была ли эта метка уже сгенерирована
                     if start_label and start_label not in generated_labels:
-                        code = generate_block(block, "", char_name_map, project_scenes)
+                        code = generate_block(block, "", char_name_map, project_scenes, generated_labels)
                         if code:
                             lines.append(code)
                             generated_labels.add(start_label)
                 else:
-                    code = generate_block(block, INDENT, char_name_map, project_scenes)
+                    code = generate_block(block, INDENT, char_name_map, project_scenes, generated_labels)
                     if code:
                         lines.append(code)
     
@@ -749,59 +766,31 @@ def generate_renpy_script(project: Project) -> str:
     # Собираем все метки, которые будут сгенерированы, чтобы избежать дубликатов
     generated_labels: Set[str] = set()
     
-    # Собираем все метки из START блоков (только они генерируют метки)
+    # Собираем все метки из START и LABEL блоков (только они генерируют метки)
     from renpy_node_editor.core.model import BlockType
+    from renpy_node_editor.core.generator.blocks import safe_get_str
     for scene in project.scenes:
         for block in scene.blocks:
             if block.type == BlockType.START:
-                start_label = block.params.get("label", "")
+                start_label = safe_get_str(block.params, "label", "") or safe_get_str(block.params, "Имя метки (label):", "")
                 if start_label:
                     generated_labels.add(start_label)
+                    print(f"DEBUG: Добавлен label '{start_label}' из START блока в сцене {scene.name}")
+            elif block.type == BlockType.LABEL:
+                label = safe_get_str(block.params, "label", "")
+                if label:
+                    generated_labels.add(label)
+                    print(f"DEBUG: Добавлен label '{label}' из LABEL блока в сцене {scene.name}")
+    
+    print(f"DEBUG: Всего собрано label'ов: {sorted(generated_labels)}")
     
     # Проверяем, есть ли метка start в START блоках
     has_start_label = "start" in generated_labels
     
     # Если нет метки start, создаем её в начале (после определений, перед сценами)
     # Это стандартная практика Ren'Py - метка start обычно идет в начале файла
-    if not has_start_label and project.scenes:
-        # Используем первый START блок из первой сцены как точку входа, если он есть
-        first_scene = project.scenes[0]
-        first_start_block = None
-        for block in first_scene.blocks:
-            if block.type == BlockType.START:
-                first_start_block = block
-                break
-        
-        if first_start_block:
-            # Есть START блок - он сам сгенерирует label
-            pass
-        else:
-            # Нет START блока - создаем стандартный label start с jump к первому START блоку
-            # Ищем первый START блок в любой сцене
-            first_start_in_project = None
-            for scene in project.scenes:
-                for block in scene.blocks:
-                    if block.type == BlockType.START:
-                        start_label = block.params.get("label", "")
-                        if start_label:
-                            first_start_in_project = start_label
-                            break
-                if first_start_in_project:
-                    break
-            
-            if first_start_in_project:
-                lines.append("\n# Main entry point\n")
-                lines.append("label start:\n")
-                lines.append(f"    jump {first_start_in_project}\n\n")
-                generated_labels.add("start")
-            else:
-                # Нет START блоков вообще - создаем пустую метку start
-                lines.append("\n# Main entry point\n")
-                lines.append("label start:\n")
-                lines.append("    return\n\n")
-                generated_labels.add("start")
-    elif not has_start_label:
-        # Если вообще нет сцен, создаем пустую метку start
+    # НЕ создаем автоматический jump - пользователь должен явно указать его через JUMP блок
+    if not has_start_label:
         lines.append("\n# Main entry point\n")
         lines.append("label start:\n")
         lines.append("    return\n\n")

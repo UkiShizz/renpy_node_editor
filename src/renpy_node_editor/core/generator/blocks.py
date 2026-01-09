@@ -189,19 +189,39 @@ def generate_for(block: Block, indent: str, loop_body: Optional[str] = None) -> 
     return "".join(lines)
 
 
-def generate_jump(block: Block, indent: str) -> str:
-    """Generate jump statement"""
+def generate_jump(block: Block, indent: str, generated_labels: Optional[set] = None) -> str:
+    """Generate jump statement only if target label exists"""
     target = safe_get_str(block.params, "target")
     if not target:
         return ""
+    
+    # Проверяем, существует ли целевой label
+    if generated_labels is not None:
+        if target not in generated_labels:
+            # Label не существует - не генерируем jump
+            print(f"DEBUG generate_jump: target '{target}' не найден в generated_labels. Доступные: {sorted(generated_labels)}")
+            return ""
+        else:
+            print(f"DEBUG generate_jump: target '{target}' найден в generated_labels, генерируем jump")
+    
     return f"{indent}jump {target}\n"
 
 
-def generate_call(block: Block, indent: str) -> str:
-    """Generate call statement"""
+def generate_call(block: Block, indent: str, generated_labels: Optional[set] = None) -> str:
+    """Generate call statement only if target label exists"""
     label = safe_get_str(block.params, "label")
     if not label:
         return ""
+    
+    # Проверяем, существует ли целевой label
+    if generated_labels is not None:
+        if label not in generated_labels:
+            # Label не существует - не генерируем call
+            print(f"DEBUG generate_call: label '{label}' не найден в generated_labels. Доступные: {sorted(generated_labels)}")
+            return ""
+        else:
+            print(f"DEBUG generate_call: label '{label}' найден в generated_labels, генерируем call")
+    
     return f"{indent}call {label}\n"
 
 
