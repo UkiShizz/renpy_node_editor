@@ -182,10 +182,6 @@ class SettingsDialog(QDialog):
         display_tab = self._create_display_tab()
         tabs.addTab(display_tab, tr("ui.settings.tab.display", "Отображение"))
         
-        # Вкладка "Экспорт"
-        export_tab = self._create_export_tab()
-        tabs.addTab(export_tab, tr("ui.settings.tab.export", "Экспорт"))
-        
         # Вкладка "Генерация кода"
         generation_tab = self._create_generation_tab()
         tabs.addTab(generation_tab, tr("ui.settings.tab.generation", "Генерация"))
@@ -247,34 +243,6 @@ class SettingsDialog(QDialog):
         other_layout.addRow("", self.auto_center_on_load)
         
         layout.addWidget(other_group)
-        layout.addStretch()
-        
-        return widget
-    
-    def _create_export_tab(self) -> QWidget:
-        """Создать вкладку настроек экспорта"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
-        
-        group = QGroupBox("Пути по умолчанию", widget)
-        group_layout = QFormLayout(group)
-        group_layout.setSpacing(10)
-        
-        # Путь по умолчанию для экспорта
-        export_path_layout = QHBoxLayout()
-        self.default_export_path = QLineEdit()
-        self.default_export_path.setPlaceholderText("Путь к папке для экспорта проектов")
-        export_path_layout.addWidget(self.default_export_path)
-        
-        btn_browse_export = QPushButton("Обзор...", group)
-        btn_browse_export.clicked.connect(self._on_browse_export_path)
-        export_path_layout.addWidget(btn_browse_export)
-        
-        group_layout.addRow("Путь экспорта:", export_path_layout)
-        
-        layout.addWidget(group)
         layout.addStretch()
         
         return widget
@@ -350,10 +318,6 @@ class SettingsDialog(QDialog):
         self.show_tooltips.setChecked(self.settings.get("show_tooltips", True))
         self.auto_center_on_load.setChecked(self.settings.get("auto_center_on_load", False))
         
-        # Экспорт
-        default_export = self.settings.get("default_export_path", "")
-        self.default_export_path.setText(default_export)
-        
         # Генерация
         self.add_comments.setChecked(self.settings.get("add_comments", False))
         self.indent_size.setValue(self.settings.get("indent_size", 4))
@@ -367,22 +331,6 @@ class SettingsDialog(QDialog):
                 self.language_combo.setCurrentIndex(i)
                 break
     
-    def _on_browse_export_path(self) -> None:
-        """Открыть диалог выбора папки для экспорта"""
-        current_path = self.default_export_path.text().strip()
-        if not current_path:
-            current_path = str(Path.home())
-        
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Выберите папку по умолчанию для экспорта",
-            current_path,
-            QFileDialog.Option.ShowDirsOnly
-        )
-        
-        if folder:
-            self.default_export_path.setText(folder)
-    
     def _on_save(self) -> None:
         """Сохранить настройки"""
         # Сохраняем настройки
@@ -390,7 +338,6 @@ class SettingsDialog(QDialog):
         self.settings["grid_size"] = self.grid_size.value()
         self.settings["show_tooltips"] = self.show_tooltips.isChecked()
         self.settings["auto_center_on_load"] = self.auto_center_on_load.isChecked()
-        self.settings["default_export_path"] = self.default_export_path.text().strip()
         self.settings["add_comments"] = self.add_comments.isChecked()
         self.settings["indent_size"] = self.indent_size.value()
         self.settings["indent_style"] = "spaces" if self.indent_style.currentIndex() == 0 else "tabs"
