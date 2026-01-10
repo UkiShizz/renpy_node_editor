@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from renpy_node_editor.core.model import BlockType
+from renpy_node_editor.core.i18n import tr
 
 # Описания блоков для палитры
 BLOCK_DESCRIPTIONS = {
@@ -126,11 +127,15 @@ PARAMETER_DESCRIPTIONS = {
 
 def get_block_tooltip(block_type: BlockType) -> str:
     """Получить подсказку для типа блока"""
-    return BLOCK_DESCRIPTIONS.get(block_type, "Блок для создания Ren'Py визуальной новеллы.")
+    key = f"tooltip.block.{block_type.name.lower()}"
+    default = BLOCK_DESCRIPTIONS.get(block_type, "Блок для создания Ren'Py визуальной новеллы.")
+    return tr(key, default)
 
 def get_parameter_tooltip(param_name: str) -> str:
     """Получить подсказку для параметра"""
-    return PARAMETER_DESCRIPTIONS.get(param_name, "Параметр блока.")
+    key = f"tooltip.parameter.{param_name}"
+    default = PARAMETER_DESCRIPTIONS.get(param_name, "Параметр блока.")
+    return tr(key, default)
 
 
 # Описания для пунктов выпадающих меню
@@ -204,19 +209,27 @@ BACKGROUND_DESCRIPTIONS = {
 
 def get_transition_tooltip(transition: str) -> str:
     """Получить подсказку для перехода"""
-    return TRANSITION_DESCRIPTIONS.get(transition, f"Переход: {transition}")
+    key = f"tooltip.transition.{transition}"
+    default = TRANSITION_DESCRIPTIONS.get(transition, f"Переход: {transition}")
+    return tr(key, default)
 
 
 def get_position_tooltip(position: str) -> str:
     """Получить подсказку для позиции"""
-    return POSITION_DESCRIPTIONS.get(position, f"Позиция: {position}")
+    key = f"tooltip.position.{position}"
+    default = POSITION_DESCRIPTIONS.get(position, f"Позиция: {position}")
+    return tr(key, default)
 
 
 def get_layer_tooltip(layer: str) -> str:
     """Получить подсказку для слоя"""
-    return LAYER_DESCRIPTIONS.get(layer, f"Слой: {layer}")
+    key = f"tooltip.layer.{layer}"
+    default = LAYER_DESCRIPTIONS.get(layer, f"Слой: {layer}")
+    return tr(key, default)
 
 
 def get_background_tooltip(background: str) -> str:
     """Получить подсказку для фона"""
-    return BACKGROUND_DESCRIPTIONS.get(background, f"Фон: {background}")
+    key = f"tooltip.background.{background}"
+    default = BACKGROUND_DESCRIPTIONS.get(background, f"Фон: {background}")
+    return tr(key, default)

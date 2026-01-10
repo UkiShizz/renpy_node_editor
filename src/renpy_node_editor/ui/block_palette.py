@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from renpy_node_editor.core.model import BlockType
+from renpy_node_editor.core.i18n import tr
 from renpy_node_editor.ui.tooltips import get_block_tooltip
 
 
@@ -69,28 +70,28 @@ class BlockPalette(QListWidget):
         """Заполнить палитру типами блоков с группировкой"""
         # Группируем блоки по категориям согласно документации Ren'Py
         categories = {
-            "📝 Диалоги и текст": [
+            tr("ui.block_palette.category.dialogs", "📝 Диалоги и текст"): [
                 BlockType.SAY, BlockType.NARRATION, BlockType.VOICE, 
                 BlockType.CENTER, BlockType.TEXT
             ],
-            "🖼️ Визуальные элементы": [
+            tr("ui.block_palette.category.visual", "🖼️ Визуальные элементы"): [
                 BlockType.SCENE, BlockType.SHOW, BlockType.HIDE, BlockType.IMAGE
             ],
-            "🔀 Логика и управление": [
+            tr("ui.block_palette.category.logic", "🔀 Логика и управление"): [
                 BlockType.START, BlockType.IF, BlockType.WHILE, BlockType.FOR, BlockType.MENU, 
                 BlockType.JUMP, BlockType.CALL, BlockType.LABEL, BlockType.RETURN
             ],
-            "🎬 Эффекты и переходы": [
+            tr("ui.block_palette.category.effects", "🎬 Эффекты и переходы"): [
                 BlockType.PAUSE, BlockType.TRANSITION, BlockType.WITH
             ],
-            "🔊 Аудио": [
+            tr("ui.block_palette.category.audio", "🔊 Аудио"): [
                 BlockType.SOUND, BlockType.MUSIC, BlockType.STOP_SOUND, 
                 BlockType.STOP_MUSIC, BlockType.QUEUE_SOUND, BlockType.QUEUE_MUSIC
             ],
-            "💾 Переменные и данные": [
+            tr("ui.block_palette.category.variables", "💾 Переменные и данные"): [
                 BlockType.SET_VAR, BlockType.DEFAULT, BlockType.DEFINE, BlockType.PYTHON
             ],
-            "👤 Определения": [
+            tr("ui.block_palette.category.definitions", "👤 Определения"): [
                 BlockType.CHARACTER, BlockType.STYLE
             ],
         }
@@ -144,7 +145,7 @@ class BlockPalettePanel(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        title = QLabel("Блоки", self)
+        title = QLabel(tr("ui.block_palette.title", "Блоки"), self)
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 

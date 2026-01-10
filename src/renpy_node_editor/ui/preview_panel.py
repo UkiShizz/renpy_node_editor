@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QFont, QColor, QTextCursor
 
+from renpy_node_editor.core.i18n import tr
+
 
 class PreviewPanel(QWidget):
     """
@@ -44,7 +46,7 @@ class PreviewPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        title = QLabel("📄 Предпросмотр Ren'Py-кода", self)
+        title = QLabel(tr("ui.preview_panel.title", "📄 Предпросмотр Ren'Py-кода"), self)
         title_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)

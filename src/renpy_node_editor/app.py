@@ -12,11 +12,16 @@ if _src_dir.is_dir() and str(_src_dir) not in sys.path:
 
 from PySide6.QtWidgets import QApplication
 
+from renpy_node_editor.core.i18n import get_language, set_language
 from renpy_node_editor.ui.main_window import MainWindow
 
 
 def main() -> int:
     app = QApplication(sys.argv)
+    
+    # Initialize language from settings
+    lang = get_language()
+    set_language(lang)
 
     window = MainWindow()
     window.show()

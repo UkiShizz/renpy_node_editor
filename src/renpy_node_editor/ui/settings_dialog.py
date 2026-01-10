@@ -13,15 +13,19 @@ from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.settings import load_settings, save_settings
 from renpy_node_editor.runner.renpy_env import default_sdk_root, RenpyEnv
+from renpy_node_editor.core.i18n import tr, get_language, set_language, reload_translations
+from PySide6.QtCore import Signal
 
 
 class SettingsDialog(QDialog):
     """Диалог настроек редактора"""
     
+    language_changed = Signal(str)  # emits language code
+    
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         
-        self.setWindowTitle("Настройки редактора")
+        self.setWindowTitle(tr("ui.settings.title", "Настройки редактора"))
         self.setMinimumSize(600, 500)
         self.resize(700, 600)
         
@@ -177,29 +181,33 @@ class SettingsDialog(QDialog):
         
         # Вкладка "Ren'Py SDK"
         renpy_tab = self._create_renpy_tab()
-        tabs.addTab(renpy_tab, "Ren'Py SDK")
+        tabs.addTab(renpy_tab, tr("ui.settings.tab.sdk", "Ren'Py SDK"))
         
         # Вкладка "Отображение"
         display_tab = self._create_display_tab()
-        tabs.addTab(display_tab, "Отображение")
+        tabs.addTab(display_tab, tr("ui.settings.tab.display", "Отображение"))
         
         # Вкладка "Экспорт"
         export_tab = self._create_export_tab()
-        tabs.addTab(export_tab, "Экспорт")
+        tabs.addTab(export_tab, tr("ui.settings.tab.export", "Экспорт"))
         
         # Вкладка "Генерация кода"
         generation_tab = self._create_generation_tab()
-        tabs.addTab(generation_tab, "Генерация")
+        tabs.addTab(generation_tab, tr("ui.settings.tab.generation", "Генерация"))
+        
+        # Вкладка "Язык"
+        language_tab = self._create_language_tab()
+        tabs.addTab(language_tab, tr("ui.settings.tab.language", "Язык"))
         
         # Кнопки внизу
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
         
-        btn_cancel = QPushButton("Отмена", self)
+        btn_cancel = QPushButton(tr("ui.settings.cancel", "Отмена"), self)
         btn_cancel.clicked.connect(self.reject)
         buttons_layout.addWidget(btn_cancel)
         
-        btn_save = QPushButton("Сохранить", self)
+        btn_save = QPushButton(tr("ui.settings.ok", "OK"), self)
         btn_save.setObjectName("primaryButton")
         btn_save.clicked.connect(self._on_save)
         buttons_layout.addWidget(btn_save)
@@ -347,6 +355,31 @@ class SettingsDialog(QDialog):
         
         return widget
     
+    def _create_language_tab(self) -> QWidget:
+        """Создать вкладку настроек языка"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+        
+        group = QGroupBox("Язык интерфейса", widget)
+        group_layout = QFormLayout(group)
+        group_layout.setSpacing(10)
+        
+        # Выбор языка
+        language_layout = QHBoxLayout()
+        self.language_combo = QComboBox()
+        self.language_combo.addItem("English", "en")
+        self.language_combo.addItem("Русский", "ru")
+        language_layout.addWidget(self.language_combo)
+        language_layout.addStretch()
+        group_layout.addRow("Язык:", language_layout)
+        
+        layout.addWidget(group)
+        layout.addStretch()
+        
+        return widget
+    
     def _load_current_settings(self) -> None:
         """Загрузить текущие настройки в UI"""
         # Ren'Py SDK
@@ -369,6 +402,13 @@ class SettingsDialog(QDialog):
         self.indent_size.setValue(self.settings.get("indent_size", 4))
         indent_style = self.settings.get("indent_style", "spaces")
         self.indent_style.setCurrentIndex(0 if indent_style == "spaces" else 1)
+        
+        # Язык
+        current_lang = self.settings.get("language", "en")
+        for i in range(self.language_combo.count()):
+            if self.language_combo.itemData(i) == current_lang:
+                self.language_combo.setCurrentIndex(i)
+                break
     
     def _validate_renpy_path(self) -> None:
         """Проверить валидность пути к Ren'Py SDK"""
@@ -451,6 +491,17 @@ class SettingsDialog(QDialog):
         self.settings["add_comments"] = self.add_comments.isChecked()
         self.settings["indent_size"] = self.indent_size.value()
         self.settings["indent_style"] = "spaces" if self.indent_style.currentIndex() == 0 else "tabs"
+        
+        # Сохраняем язык
+        selected_lang = self.language_combo.currentData()
+        if selected_lang:
+            old_lang = self.settings.get("language", "en")
+            self.settings["language"] = selected_lang
+            set_language(selected_lang)
+            reload_translations()
+            # Эмитим сигнал, если язык изменился
+            if selected_lang != old_lang:
+                self.language_changed.emit(selected_lang)
         
         save_settings(self.settings)
         

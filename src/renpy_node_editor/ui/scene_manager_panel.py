@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QColor
 
 from renpy_node_editor.core.model import Project, Scene
+from renpy_node_editor.core.i18n import tr
 
 
 class SceneManagerPanel(QWidget):
@@ -90,7 +91,7 @@ class SceneManagerPanel(QWidget):
         layout.setSpacing(8)
         
         # Заголовок
-        title = QLabel("🎬 Сцены")
+        title = QLabel(tr("ui.scene_manager.title", "🎬 Сцены"))
         title_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)
@@ -100,25 +101,25 @@ class SceneManagerPanel(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(4)
         
-        btn_add = QPushButton("➕ Создать", self)
-        btn_add.setToolTip("Создать новую сцену в проекте")
+        btn_add = QPushButton(tr("ui.scene_manager.create", "➕ Создать"), self)
+        btn_add.setToolTip(tr("ui.scene_manager.create_tooltip", "Создать новую сцену в проекте"))
         btn_add.clicked.connect(self._on_add_scene)
         buttons_layout.addWidget(btn_add)
         
-        btn_delete = QPushButton("➖ Удалить", self)
-        btn_delete.setToolTip("Удалить выбранную сцену из проекта")
+        btn_delete = QPushButton(tr("ui.scene_manager.delete", "➖ Удалить"), self)
+        btn_delete.setToolTip(tr("ui.scene_manager.delete_tooltip", "Удалить выбранную сцену из проекта"))
         btn_delete.clicked.connect(self._on_delete_scene)
         buttons_layout.addWidget(btn_delete)
         
         # Кнопки для изменения порядка сцен
-        btn_up = QPushButton("⬆️", self)
-        btn_up.setToolTip("Переместить сцену вверх (раньше в порядке генерации)")
+        btn_up = QPushButton(tr("ui.scene_manager.move_up", "⬆️"), self)
+        btn_up.setToolTip(tr("ui.scene_manager.move_up_tooltip", "Переместить сцену вверх (раньше в порядке генерации)"))
         btn_up.setMaximumWidth(40)
         btn_up.clicked.connect(self._on_move_scene_up)
         buttons_layout.addWidget(btn_up)
         
-        btn_down = QPushButton("⬇️", self)
-        btn_down.setToolTip("Переместить сцену вниз (позже в порядке генерации)")
+        btn_down = QPushButton(tr("ui.scene_manager.move_down", "⬇️"), self)
+        btn_down.setToolTip(tr("ui.scene_manager.move_down_tooltip", "Переместить сцену вниз (позже в порядке генерации)"))
         btn_down.setMaximumWidth(40)
         btn_down.clicked.connect(self._on_move_scene_down)
         buttons_layout.addWidget(btn_down)
@@ -176,14 +177,14 @@ class SceneManagerPanel(QWidget):
     def _on_add_scene(self) -> None:
         """Создать новую сцену"""
         if not self._project:
-            QMessageBox.warning(self, "Нет проекта", "Сначала создайте проект.")
+            QMessageBox.warning(self, tr("ui.scene_manager.no_project", "Нет проекта"), tr("ui.scene_manager.no_project_text", "Сначала создайте проект."))
             return
         
         # Запрашиваем имя сцены
         name, ok = QInputDialog.getText(
             self, 
-            "Новая сцена", 
-            "Имя сцены:",
+            tr("ui.scene_manager.new_scene", "Новая сцена"), 
+            tr("ui.scene_manager.scene_name", "Имя сцены:"),
             text=f"Scene_{len(self._project.scenes) + 1}"
         )
         if not ok or not name:
@@ -192,8 +193,8 @@ class SceneManagerPanel(QWidget):
         # Запрашиваем метку (label)
         label, ok = QInputDialog.getText(
             self,
-            "Новая сцена",
-            "Метка (label) для Ren'Py:",
+            tr("ui.scene_manager.new_scene", "Новая сцена"),
+            tr("ui.scene_manager.scene_label", "Метка (label) для Ren'Py:"),
             text=name.lower().replace(" ", "_")
         )
         if not ok or not label:
@@ -232,7 +233,7 @@ class SceneManagerPanel(QWidget):
         
         current_item = self.scenes_list.currentItem()
         if not current_item:
-            QMessageBox.warning(self, "Нет выбора", "Выберите сцену для удаления.")
+            QMessageBox.warning(self, tr("ui.scene_manager.no_selection", "Нет выбора"), tr("ui.scene_manager.no_selection_text", "Выберите сцену для удаления."))
             return
         
         scene_id = current_item.data(Qt.UserRole)
@@ -244,8 +245,8 @@ class SceneManagerPanel(QWidget):
         # Подтверждение удаления
         reply = QMessageBox.question(
             self,
-            "Удаление сцены",
-            f"Вы уверены, что хотите удалить сцену '{scene.name}'?",
+            tr("ui.scene_manager.delete_scene", "Удаление сцены"),
+            tr("ui.scene_manager.delete_scene_confirm", "Вы уверены, что хотите удалить сцену '{name}'?").format(name=scene.name),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -255,8 +256,8 @@ class SceneManagerPanel(QWidget):
             if len(self._project.scenes) <= 1:
                 QMessageBox.warning(
                     self,
-                    "Ошибка",
-                    "Нельзя удалить последнюю сцену в проекте."
+                    tr("ui.scene_manager.cannot_delete_last", "Ошибка"),
+                    tr("ui.scene_manager.cannot_delete_last_text", "Нельзя удалить последнюю сцену в проекте.")
                 )
                 return
             
@@ -270,8 +271,8 @@ class SceneManagerPanel(QWidget):
             if self._project.find_scene(scene_id):
                 QMessageBox.warning(
                     self,
-                    "Ошибка",
-                    "Не удалось удалить сцену."
+                    tr("ui.scene_manager.delete_error", "Ошибка"),
+                    tr("ui.scene_manager.delete_error_text", "Не удалось удалить сцену.")
                 )
                 return
             

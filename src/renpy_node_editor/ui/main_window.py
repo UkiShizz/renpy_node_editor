@@ -19,6 +19,7 @@ from PySide6.QtGui import QFont
 
 from renpy_node_editor.app_controller import EditorController
 from renpy_node_editor.core.model import Scene, Project
+from renpy_node_editor.core.i18n import tr
 from renpy_node_editor.ui.block_palette import BlockPalette
 from renpy_node_editor.ui.node_graph.node_view import NodeView
 from renpy_node_editor.ui.preview_panel import PreviewPanel
@@ -49,7 +50,7 @@ class MainWindow(QMainWindow):
         self._code_generation_timer.setSingleShot(True)
         self._code_generation_timer.timeout.connect(self._update_preview_code)
 
-        self.setWindowTitle("RenPy Node Editor")
+        self.setWindowTitle(tr("ui.main_window.title", "RenPy Node Editor"))
         self.resize(1400, 800)
         
         # Применяем темную тему
@@ -183,21 +184,21 @@ class MainWindow(QMainWindow):
         top_bar.setSpacing(8)
         main_layout.addLayout(top_bar)
 
-        btn_new = QPushButton("📁 Новый проект", self)
-        btn_new.setToolTip("Создать новый проект визуальной новеллы")
-        btn_open = QPushButton("📂 Открыть", self)
-        btn_open.setToolTip("Открыть существующий проект")
-        self.btn_save = QPushButton("💾 Сохранить", self)
-        self.btn_save.setToolTip("Сохранить текущий проект")
+        btn_new = QPushButton(tr("ui.main_window.new_project", "📁 Новый проект"), self)
+        btn_new.setToolTip(tr("ui.main_window.new_project_tooltip", "Создать новый проект визуальной новеллы"))
+        btn_open = QPushButton(tr("ui.main_window.open_project", "📂 Открыть"), self)
+        btn_open.setToolTip(tr("ui.main_window.open_project_tooltip", "Открыть существующий проект"))
+        self.btn_save = QPushButton(tr("ui.main_window.save_project", "💾 Сохранить"), self)
+        self.btn_save.setToolTip(tr("ui.main_window.save_project_tooltip", "Сохранить текущий проект"))
         self.btn_save.setEnabled(False)  # По умолчанию неактивна
-        btn_export = QPushButton("📤 Экспорт в Ren'Py", self)
-        btn_export.setToolTip("Экспортировать проект в готовый проект Ren'Py (папку)")
-        btn_center = QPushButton("🎯 Центр", self)
-        btn_center.setToolTip("Вернуться в центр рабочей области (0, 0)")
-        btn_settings = QPushButton("⚙️ Настройки", self)
-        btn_settings.setToolTip("Открыть настройки редактора")
-        self.btn_toggle_preview = QPushButton("📄 Код", self)
-        self.btn_toggle_preview.setToolTip("Показать/скрыть панель предпросмотра кода")
+        btn_export = QPushButton(tr("ui.main_window.export_project", "📤 Экспорт в Ren'Py"), self)
+        btn_export.setToolTip(tr("ui.main_window.export_project_tooltip", "Экспортировать проект в готовый проект Ren'Py (папку)"))
+        btn_center = QPushButton(tr("ui.main_window.center_view", "🎯 Центр"), self)
+        btn_center.setToolTip(tr("ui.main_window.center_view_tooltip", "Вернуться в центр рабочей области (0, 0)"))
+        btn_settings = QPushButton(tr("ui.main_window.settings", "⚙️ Настройки"), self)
+        btn_settings.setToolTip(tr("ui.main_window.settings_tooltip", "Открыть настройки редактора"))
+        self.btn_toggle_preview = QPushButton(tr("ui.main_window.code_preview", "📄 Код"), self)
+        self.btn_toggle_preview.setToolTip(tr("ui.main_window.code_preview_tooltip", "Показать/скрыть панель предпросмотра кода"))
         self.btn_toggle_preview.setCheckable(True)
         self.btn_toggle_preview.setChecked(False)
 
@@ -244,7 +245,7 @@ class MainWindow(QMainWindow):
         self.right_splitter.addWidget(self.scene_manager)
 
         # Палитра блоков
-        palette_label = QLabel("📦 Блоки", self)
+        palette_label = QLabel(tr("ui.main_window.blocks", "📦 Блоки"), self)
         palette_label.setAlignment(Qt.AlignCenter)
         palette_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
         palette_label.setFont(palette_font)
@@ -743,7 +744,20 @@ class MainWindow(QMainWindow):
         from renpy_node_editor.ui.settings_dialog import SettingsDialog
         
         dialog = SettingsDialog(self)
+        dialog.language_changed.connect(self._on_language_changed)
         dialog.exec()
+    
+    def _on_language_changed(self, lang: str) -> None:
+        """Обработка изменения языка"""
+        from renpy_node_editor.core.i18n import reload_translations
+        reload_translations()
+        # Обновляем все строки в UI
+        self._update_ui_texts()
+    
+    def _update_ui_texts(self) -> None:
+        """Обновить все текстовые строки в UI после изменения языка"""
+        # Обновляем заголовок окна
+        self.setWindowTitle(tr("ui.main_window.title", "RenPy Node Editor"))
     
     def _on_scene_selected(self, scene: Scene) -> None:
         """Обработка выбора сцены"""

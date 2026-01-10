@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont
 
-from renpy_node_editor.core.model import Block, BlockType, Project
+from renpy_node_editor.core.model import Block, BlockType
+from renpy_node_editor.core.i18n import tr, Project
 from renpy_node_editor.ui.tooltips import (
     get_parameter_tooltip,
     get_transition_tooltip,
@@ -170,7 +171,7 @@ class BlockPropertiesPanel(QWidget):
         self.properties_layout.setSpacing(8)
         self.properties_layout.setContentsMargins(8, 8, 8, 8)
         
-        title = QLabel("⚙️ Свойства блока")
+        title = QLabel(tr("ui.block_properties.title", "⚙️ Свойства блока"))
         title_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)
