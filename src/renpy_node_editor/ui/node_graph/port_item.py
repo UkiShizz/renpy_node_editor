@@ -26,6 +26,9 @@ class PortItem(QGraphicsEllipseItem):
     ) -> None:
         # Увеличиваем размер порта
         super().__init__(-8, -8, 16, 16, parent)
+        
+        # Порты должны быть выше соединений для кликабельности
+        self.setZValue(1)
 
         self.is_output: bool = is_output
         self.name: str = name

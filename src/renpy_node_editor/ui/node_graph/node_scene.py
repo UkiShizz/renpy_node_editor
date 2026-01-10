@@ -558,13 +558,41 @@ class NodeScene(QGraphicsScene):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # type: ignore[override]
         view = self.views()[0] if self.views() else None
-        item = self.itemAt(event.scenePos(), view.transform()) if view else None
+        
+        # Используем items() для получения всех элементов в точке клика
+        # Это позволяет найти соединения даже если они под блоками
+        items_at_point = self.items(event.scenePos()) if view else []
+        
+        # Ищем порт, соединение или блок в порядке приоритета
+        port_item = None
+        connection_item = None
+        node_item = None
+        
+        for item in items_at_point:
+            if isinstance(item, PortItem) and not port_item:
+                port_item = item
+            elif isinstance(item, ConnectionItem) and not connection_item:
+                connection_item = item
+            elif isinstance(item, NodeItem) and not node_item:
+                node_item = item
 
-        if event.button() == Qt.LeftButton and isinstance(item, PortItem) and item.is_output:
-            self._drag_src_port = item
-            self._drag_connection = ConnectionItem(src_port=item)
+        # Если клик по порту - начинаем перетаскивание соединения
+        if event.button() == Qt.LeftButton and port_item and port_item.is_output:
+            self._drag_src_port = port_item
+            self._drag_connection = ConnectionItem(src_port=port_item)
             self.addItem(self._drag_connection)
             self._drag_connection.set_tmp_end(event.scenePos())
+            event.accept()
+            return
+        
+        # Если клик по соединению - позволяем его выделить
+        if event.button() == Qt.LeftButton and connection_item:
+            # Если соединение не выделено, выделяем его
+            if not connection_item.isSelected():
+                # Если не зажат Ctrl, снимаем выделение с других элементов
+                if event.modifiers() != Qt.KeyboardModifier.ControlModifier:
+                    self.clearSelection()
+                connection_item.setSelected(True)
             event.accept()
             return
 

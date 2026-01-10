@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QPointF, Qt, QRectF
 from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter, QPolygonF, QLinearGradient, QBrush, QPainterPathStroker
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsItem
 import math
@@ -21,10 +21,14 @@ class ConnectionItem(QGraphicsPathItem):
         self.dst_port = dst_port
         self.connection_id = connection_id  # ID связи в модели
 
-        self.setZValue(-1)
+        # Устанавливаем zValue выше блоков, чтобы соединения можно было кликать
+        # Но ниже портов, чтобы порты были доступны для создания соединений
+        self.setZValue(0)
         
         # Делаем соединение выделяемым
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        # Отключаем перемещение для соединений
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
         
         # Улучшенная линия с градиентом
         self._pen = QPen(QColor("#6A6A6A"), 2.5)
@@ -77,12 +81,18 @@ class ConnectionItem(QGraphicsPathItem):
         if path.isEmpty():
             return super().shape()
         
-        # Создаем более широкую область для клика (stroke width ~10px)
+        # Создаем более широкую область для клика (stroke width ~15px для удобства)
         stroker = QPainterPathStroker()
-        stroker.setWidth(10)
+        stroker.setWidth(15)
         stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
         stroker.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         return stroker.createStroke(path)
+    
+    def boundingRect(self) -> QRectF:
+        """Увеличиваем bounding rect для лучшей обработки кликов"""
+        rect = super().boundingRect()
+        # Добавляем отступ для области клика
+        return rect.adjusted(-5, -5, 5, 5)
 
     def update_path(self):
         """Redraw smooth curve between ports with arrow at the end"""
