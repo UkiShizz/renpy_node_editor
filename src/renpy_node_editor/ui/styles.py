@@ -69,9 +69,6 @@ RADIUS = {
     'round': '50%',
 }
 
-# Transitions
-TRANSITION = 'all 0.2s ease-in-out'
-
 
 def get_main_window_style() -> str:
     """Get stylesheet for main window"""
@@ -102,13 +99,11 @@ def get_main_window_style() -> str:
         QPushButton:hover {{
             background-color: {COLORS['bg_hover']};
             border-color: {COLORS['border_hover']};
-            transform: translateY(-1px);
         }}
         
         QPushButton:pressed {{
             background-color: {COLORS['bg_active']};
             border-color: {COLORS['border_secondary']};
-            transform: translateY(0px);
         }}
         
         QPushButton:disabled {{
