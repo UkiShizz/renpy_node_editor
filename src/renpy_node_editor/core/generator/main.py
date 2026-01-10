@@ -812,6 +812,7 @@ def generate_renpy_script(project: Project) -> str:
     char_name_map: Dict[str, str] = {}
     
     # Собираем display_name из CHARACTER блоков
+    # BlockType уже импортирован в начале файла
     character_display_names: Dict[str, str] = {}
     for scene in project.scenes:
         for block in scene.blocks:
@@ -850,8 +851,7 @@ def generate_renpy_script(project: Project) -> str:
     # Собираем все возможные метки из START и LABEL блоков для проверки JUMP/CALL
     # НЕ добавляем их в generated_labels заранее - они будут добавлены при генерации
     all_possible_labels: Set[str] = set()
-    from renpy_node_editor.core.model import BlockType
-    from renpy_node_editor.core.generator.blocks import safe_get_str
+    # BlockType и safe_get_str уже импортированы в начале файла
     for scene in project.scenes:
         for block in scene.blocks:
             if block.type == BlockType.START:
