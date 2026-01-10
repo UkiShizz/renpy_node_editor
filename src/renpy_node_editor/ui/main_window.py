@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(tr("ui.main_window.title", "RenPy Node Editor"))
         
-        # Загружаем настройки окна
+        # Загружаем настройки окна (размер, позиция, но не максимизация - она будет применена в showEvent)
         self._load_window_settings()
         
         # Применяем темную тему
@@ -794,34 +794,40 @@ class MainWindow(QMainWindow):
                 self.right_splitter.setStretchFactor(i, factor)
     
     def _load_window_settings(self) -> None:
-        """Загрузить настройки окна (размер, позиция и состояние максимизации)"""
+        """Загрузить настройки окна (размер и позиция)"""
         settings = load_settings()
         
-        # Загружаем состояние максимизации
-        is_maximized = settings.get("window_maximized", False)
+        # Сохраняем флаг максимизации для применения в showEvent
+        self._should_maximize = settings.get("window_maximized", False)
         
-        if is_maximized:
-            # Если окно было максимизировано, показываем его максимизированным
-            # Размер и позиция будут восстановлены автоматически при разворачивании
-            self.showMaximized()
+        # Загружаем размер окна (даже если максимизировано, нужен для восстановления)
+        width = settings.get("window_width", 1400)
+        height = settings.get("window_height", 800)
+        self.resize(width, height)
+        
+        # Загружаем позицию окна (если сохранена)
+        x = settings.get("window_x")
+        y = settings.get("window_y")
+        if x is not None and y is not None:
+            self.move(x, y)
         else:
-            # Загружаем размер окна
-            width = settings.get("window_width", 1400)
-            height = settings.get("window_height", 800)
-            self.resize(width, height)
-            
-            # Загружаем позицию окна (если сохранена)
-            x = settings.get("window_x")
-            y = settings.get("window_y")
-            if x is not None and y is not None:
-                self.move(x, y)
-            else:
-                # Центрируем окно, если позиция не сохранена
-                from PySide6.QtWidgets import QApplication
-                screen = QApplication.primaryScreen().geometry()
-                window_geometry = self.frameGeometry()
-                window_geometry.moveCenter(screen.center())
-                self.move(window_geometry.topLeft())
+            # Центрируем окно, если позиция не сохранена
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen().geometry()
+            window_geometry = self.frameGeometry()
+            window_geometry.moveCenter(screen.center())
+            self.move(window_geometry.topLeft())
+    
+    def showEvent(self, event) -> None:  # type: ignore[override]
+        """Обработчик показа окна - применяем максимизацию если нужно"""
+        super().showEvent(event)
+        
+        # Применяем максимизацию после того, как окно показано (только при первом показе)
+        if hasattr(self, '_should_maximize') and self._should_maximize:
+            # Убираем флаг, чтобы не максимизировать при каждом показе
+            self._should_maximize = False
+            # Используем QTimer для отложенного вызова, чтобы окно успело полностью инициализироваться
+            QTimer.singleShot(10, self.showMaximized)
     
     def _save_window_settings(self) -> None:
         """Сохранить настройки окна (размер, позиция и состояние максимизации)"""
