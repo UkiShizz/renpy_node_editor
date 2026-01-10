@@ -139,8 +139,8 @@ class NodeView(QGraphicsView):
     def keyPressEvent(self, event: QKeyEvent) -> None:  # type: ignore[override]
         """Обработка нажатий клавиш"""
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
-            # Удаляем выбранные блоки
-            self._scene.delete_selected_blocks()
+            # Удаляем выбранные элементы (блоки и соединения)
+            self._scene.delete_selected_items()
             event.accept()
             return
         

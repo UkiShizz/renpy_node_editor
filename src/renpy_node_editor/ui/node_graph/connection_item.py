@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter, QPolygonF, QLinearGradient, QBrush
-from PySide6.QtWidgets import QGraphicsPathItem
+from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter, QPolygonF, QLinearGradient, QBrush, QPainterPathStroker
+from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsItem
 import math
 
 
@@ -23,6 +23,9 @@ class ConnectionItem(QGraphicsPathItem):
 
         self.setZValue(-1)
         
+        # Делаем соединение выделяемым
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        
         # Улучшенная линия с градиентом
         self._pen = QPen(QColor("#6A6A6A"), 2.5)
         self._pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -32,7 +35,7 @@ class ConnectionItem(QGraphicsPathItem):
         # Цвета для градиента
         self._base_color = QColor("#6A6A6A")
         self._highlight_color = QColor("#4A9EFF")
-        self._is_highlighted = False  # Флаг для подсветки при выделении связанных блоков
+        self._is_highlighted = False  # Флаг для подсветки при выделении
 
         self._tmp_end = None
         self._arrow_end = None
@@ -61,6 +64,25 @@ class ConnectionItem(QGraphicsPathItem):
         if self._is_highlighted != highlighted:
             self._is_highlighted = highlighted
             self.update()  # Принудительно обновляем отрисовку
+    
+    def setSelected(self, selected: bool) -> None:  # type: ignore[override]
+        """Обработка выделения соединения"""
+        super().setSelected(selected)
+        self._is_highlighted = selected
+        self.update()  # Принудительно обновляем отрисовку
+    
+    def shape(self) -> QPainterPath:
+        """Увеличиваем область клика для соединения"""
+        path = self.path()  # Используем путь соединения
+        if path.isEmpty():
+            return super().shape()
+        
+        # Создаем более широкую область для клика (stroke width ~10px)
+        stroker = QPainterPathStroker()
+        stroker.setWidth(10)
+        stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
+        stroker.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        return stroker.createStroke(path)
 
     def update_path(self):
         """Redraw smooth curve between ports with arrow at the end"""

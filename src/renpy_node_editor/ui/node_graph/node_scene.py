@@ -664,60 +664,8 @@ class NodeScene(QGraphicsScene):
         if self._is_loading:
             return
         
-        # Подсветка соединений, связанных с выбранными блоками
-        try:
-            # Получаем список всех соединений в сцене
-            all_connections = []
-            items_list = list(self.items())
-            for item in items_list:
-                if isinstance(item, ConnectionItem):
-                    all_connections.append(item)
-            
-            # Сначала сбрасываем подсветку всех соединений
-            for connection in all_connections:
-                try:
-                    if hasattr(connection, 'set_highlighted'):
-                        connection.set_highlighted(False)
-                        connection.update()
-                except (RuntimeError, AttributeError):
-                    continue
-            
-            # Получаем выбранные блоки
-            selected_items = self.selectedItems()
-            selected_nodes = [item for item in selected_items if isinstance(item, NodeItem)]
-            
-            if selected_nodes:
-                # Собираем все порты выбранных блоков
-                selected_ports = set()
-                for node_item in selected_nodes:
-                    try:
-                        if hasattr(node_item, 'inputs'):
-                            for port in node_item.inputs:
-                                selected_ports.add(port)
-                        if hasattr(node_item, 'outputs'):
-                            for port in node_item.outputs:
-                                selected_ports.add(port)
-                    except (RuntimeError, AttributeError):
-                        continue
-                
-                # Подсвечиваем соединения, связанные с выбранными портами
-                for connection in all_connections:
-                    try:
-                        # Проверяем, связано ли соединение с выбранными портами
-                        is_connected = False
-                        if hasattr(connection, 'src_port') and connection.src_port in selected_ports:
-                            is_connected = True
-                        if hasattr(connection, 'dst_port') and connection.dst_port in selected_ports:
-                            is_connected = True
-                        
-                        if is_connected and hasattr(connection, 'set_highlighted'):
-                            connection.set_highlighted(True)
-                            connection.update()
-                    except (RuntimeError, AttributeError):
-                        continue
-        except (RuntimeError, AttributeError) as e:
-            # Игнорируем ошибки при подсветке
-            pass
+        # Подсветка соединений теперь происходит через setSelected в ConnectionItem
+        # Убираем автоматическую подсветку при выделении блоков
         
         try:
             # Проверяем, что сцена еще существует
@@ -785,19 +733,46 @@ class NodeScene(QGraphicsScene):
     
     # ---- deletion ----
     
-    def delete_selected_blocks(self) -> None:
-        """Удалить выбранные блоки"""
-        selected_items = [item for item in self.selectedItems() if isinstance(item, NodeItem)]
+    def delete_selected_items(self) -> None:
+        """Удалить выбранные элементы (блоки и соединения)"""
+        selected_items = self.selectedItems()
         if not selected_items:
             return
         
         if not self._scene_model:
             return
         
+        # Разделяем на блоки и соединения
+        selected_blocks = [item for item in selected_items if isinstance(item, NodeItem)]
+        selected_connections = [item for item in selected_items if isinstance(item, ConnectionItem)]
+        
+        # Удаляем соединения
+        if selected_connections:
+            for connection_item in selected_connections:
+                self.delete_connection(connection_item)
+        
+        # Удаляем блоки
+        if selected_blocks:
+            self._delete_blocks(selected_blocks)
+    
+    def delete_selected_blocks(self) -> None:
+        """Удалить выбранные блоки (для обратной совместимости)"""
+        selected_items = [item for item in self.selectedItems() if isinstance(item, NodeItem)]
+        if selected_items:
+            self._delete_blocks(selected_items)
+    
+    def _delete_blocks(self, selected_blocks: list) -> None:
+        """Удалить указанные блоки"""
+        if not selected_blocks:
+            return
+        
+        if not self._scene_model:
+            return
+        
         # Подтверждение удаления
-        count = len(selected_items)
+        count = len(selected_blocks)
         if count == 1:
-            block_name = selected_items[0].block.type.name
+            block_name = selected_blocks[0].block.type.name
             message = f"Вы уверены, что хотите удалить блок '{block_name}'?"
         else:
             message = f"Вы уверены, что хотите удалить {count} блоков?"
@@ -818,7 +793,7 @@ class NodeScene(QGraphicsScene):
                 if scene_in_project:
                     scene_to_use = scene_in_project
             
-            for item in selected_items:
+            for item in selected_blocks:
                 # Сначала очищаем все связи от портов
                 for port in item.inputs + item.outputs:
                     # Создаем копию списка connections
@@ -848,16 +823,31 @@ class NodeScene(QGraphicsScene):
         if not self._scene_model or not connection_item.connection_id:
             return
         
-        # Подтверждение удаления
-        reply = QMessageBox.question(
-            None,
-            "Удаление связи",
-            "Вы уверены, что хотите удалить эту связь?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        # Удаляем без подтверждения для удобства (можно удалить несколько за раз)
+        # Убеждаемся, что используем правильный объект Scene из проекта
+        scene_to_use = self._scene_model
+        if self._project:
+            scene_in_project = self._project.find_scene(self._scene_model.id)
+            if scene_in_project:
+                scene_to_use = scene_in_project
         
-        if reply == QMessageBox.Yes:
+        # Удаляем connection из правильного объекта Scene
+        scene_to_use.remove_connection(connection_item.connection_id)
+        # Эмитим сигнал об изменении проекта
+        self.project_modified.emit()
+        
+        # Обновляем локальную ссылку, если это тот же объект
+        if self._scene_model.id == scene_to_use.id:
+            self._scene_model = scene_to_use
+        
+        # Отсоединяем от портов
+        if connection_item.src_port:
+            connection_item.src_port.remove_connection(connection_item)
+        if connection_item.dst_port:
+            connection_item.dst_port.remove_connection(connection_item)
+        
+        # Удаляем визуально
+        self.removeItem(connection_item)
             # Убеждаемся, что используем правильный объект Scene из проекта
             scene_to_use = self._scene_model
             if self._project:
