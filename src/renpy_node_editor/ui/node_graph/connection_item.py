@@ -32,6 +32,7 @@ class ConnectionItem(QGraphicsPathItem):
         # Цвета для градиента
         self._base_color = QColor("#6A6A6A")
         self._highlight_color = QColor("#4A9EFF")
+        self._is_highlighted = False  # Флаг для подсветки при выделении связанных блоков
 
         self._tmp_end = None
         self._arrow_end = None
@@ -51,8 +52,14 @@ class ConnectionItem(QGraphicsPathItem):
         self.update_path()
         
         # Меняем цвет на более яркий при установке связи
-        self._pen.setColor(QColor("#C0C0C0"))
+        self._pen.setColor(self._highlight_color)
+        self._pen.setWidth(3)
         self.setPen(self._pen)
+    
+    def set_highlighted(self, highlighted: bool) -> None:
+        """Установить подсветку соединения"""
+        self._is_highlighted = highlighted
+        self.update()
 
     def update_path(self):
         """Redraw smooth curve between ports with arrow at the end"""
@@ -172,8 +179,8 @@ class ConnectionItem(QGraphicsPathItem):
     
     def _draw_arrow(self, painter: QPainter, end_point: QPointF, direction: tuple[float, float]) -> None:
         """Нарисовать стрелку в конце соединения с улучшенным дизайном"""
-        arrow_size = 12
-        arrow_width = 7
+        arrow_size = 12 if not self._is_highlighted else 14
+        arrow_width = 7 if not self._is_highlighted else 8
         
         dx, dy = direction
         
@@ -202,21 +209,24 @@ class ConnectionItem(QGraphicsPathItem):
         arrow_polygon = QPolygonF([arrow_tip, arrow_left, arrow_right])
         
         # Определяем цвет стрелки
-        if self.dst_port is not None:
+        if self._is_highlighted:
+            arrow_color = QColor(74, 158, 255)  # #4A9EFF
+        elif self.dst_port is not None:
             arrow_color = self._highlight_color
         else:
             arrow_color = self._pen.color()
         
         # Рисуем свечение вокруг стрелки
         if self.dst_port is not None:
-            glow_pen = QPen(QColor(arrow_color.red(), arrow_color.green(), arrow_color.blue(), 80), 5)
+            glow_opacity = 120 if self._is_highlighted else 80
+            glow_pen = QPen(QColor(arrow_color.red(), arrow_color.green(), arrow_color.blue(), glow_opacity), 6 if self._is_highlighted else 5)
             painter.setPen(glow_pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawPolygon(arrow_polygon)
         
         # Основная стрелка
         painter.setBrush(QBrush(arrow_color))
-        painter.setPen(QPen(arrow_color.darker(120), 1))
+        painter.setPen(QPen(arrow_color.darker(120), 1.5 if self._is_highlighted else 1))
         painter.drawPolygon(arrow_polygon)
 
     def detach_from(self, port):

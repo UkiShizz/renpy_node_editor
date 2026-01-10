@@ -664,6 +664,29 @@ class NodeScene(QGraphicsScene):
         if self._is_loading:
             return
         
+        # Подсветка соединений, связанных с выбранными блоками
+        # Сначала сбрасываем подсветку всех соединений
+        for item in self.items():
+            if isinstance(item, ConnectionItem):
+                if hasattr(item, 'set_highlighted'):
+                    item.set_highlighted(False)
+                    item.update()
+        
+        # Подсвечиваем соединения, связанные с выбранными блоками
+        try:
+            selected_items = self.selectedItems()
+            selected_nodes = [item for item in selected_items if isinstance(item, NodeItem)]
+            
+            for node_item in selected_nodes:
+                # Подсвечиваем все соединения этого блока
+                for port in node_item.inputs + node_item.outputs:
+                    for connection in port.connections:
+                        if hasattr(connection, 'set_highlighted'):
+                            connection.set_highlighted(True)
+                            connection.update()
+        except (RuntimeError, AttributeError):
+            pass
+        
         try:
             # Проверяем, что сцена еще существует
             if not self._scene_model:
