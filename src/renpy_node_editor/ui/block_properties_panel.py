@@ -12,7 +12,8 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType
-from renpy_node_editor.core.i18n import tr, Project
+from renpy_node_editor.core.i18n import tr
+from renpy_node_editor.core.model import Project
 from renpy_node_editor.ui.tooltips import (
     get_parameter_tooltip,
     get_transition_tooltip,
