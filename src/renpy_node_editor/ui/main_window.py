@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -43,6 +43,11 @@ class MainWindow(QMainWindow):
         
         # Флаг для отслеживания несохраненных изменений
         self._is_modified = False
+        
+        # Таймер для отложенной генерации кода (debounce)
+        self._code_generation_timer = QTimer(self)
+        self._code_generation_timer.setSingleShot(True)
+        self._code_generation_timer.timeout.connect(self._update_preview_code)
 
         self.setWindowTitle("RenPy Node Editor")
         self.resize(1400, 800)
@@ -59,13 +64,16 @@ class MainWindow(QMainWindow):
         """Подключить сигналы для отслеживания изменений проекта"""
         # Изменения свойств блоков
         self.properties_panel.properties_saved.connect(self._mark_modified)
+        self.properties_panel.properties_saved.connect(self._schedule_code_update)
         
         # Изменения в node_scene (добавление/удаление блоков и соединений)
         if self.node_view and self.node_view.node_scene:
             self.node_view.node_scene.project_modified.connect(self._mark_modified)
+            self.node_view.node_scene.project_modified.connect(self._schedule_code_update)
         
         # Изменения в сценах (добавление/удаление)
         self.scene_manager.scenes_modified.connect(self._mark_modified)
+        self.scene_manager.scenes_modified.connect(self._schedule_code_update)
     
     def _mark_modified(self) -> None:
         """Пометить проект как измененный"""
@@ -178,8 +186,6 @@ class MainWindow(QMainWindow):
         self.btn_save = QPushButton("💾 Сохранить", self)
         self.btn_save.setToolTip("Сохранить текущий проект")
         self.btn_save.setEnabled(False)  # По умолчанию неактивна
-        btn_generate = QPushButton("⚙️ Сгенерировать код", self)
-        btn_generate.setToolTip("Сгенерировать Ren'Py код и показать в панели предпросмотра")
         btn_export = QPushButton("📤 Экспорт в Ren'Py", self)
         btn_export.setToolTip("Экспортировать проект в готовый проект Ren'Py (папку)")
         btn_center = QPushButton("🎯 Центр", self)
@@ -194,7 +200,6 @@ class MainWindow(QMainWindow):
         btn_new.clicked.connect(self._on_new_project)
         btn_open.clicked.connect(self._on_open_project)
         self.btn_save.clicked.connect(self._on_save_project)
-        btn_generate.clicked.connect(self._on_generate_code)
         btn_export.clicked.connect(self._on_export_rpy)
         btn_center.clicked.connect(self._on_center_view)
         btn_settings.clicked.connect(self._on_open_settings)
@@ -202,7 +207,7 @@ class MainWindow(QMainWindow):
 
         # Кнопка просмотра кода слева, остальные справа
         top_bar.addWidget(self.btn_toggle_preview)
-        for w in (btn_new, btn_open, self.btn_save, btn_generate, btn_export, btn_center, btn_settings):
+        for w in (btn_new, btn_open, self.btn_save, btn_export, btn_center, btn_settings):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
@@ -346,7 +351,8 @@ class MainWindow(QMainWindow):
             # Переподключаем сигналы отслеживания изменений
             self._connect_modification_signals()
             
-            self.preview_panel.clear()
+            # Обновляем код в предпросмотре при загрузке проекта
+            self._update_preview_code()
             self._update_window_title()
         except Exception as e:
             QMessageBox.critical(
@@ -496,21 +502,27 @@ class MainWindow(QMainWindow):
         # Помечаем проект как сохраненный
         self._mark_saved()
 
-    def _on_generate_code(self) -> None:
-        code = self._controller.generate_script()
-        if not code:
-            QMessageBox.warning(
-                self,
-                "Нет проекта",
-                "Сначала создай или открой проект.",
-            )
+    def _schedule_code_update(self) -> None:
+        """Запланировать обновление кода с небольшой задержкой (debounce)"""
+        # Останавливаем предыдущий таймер, если он был запущен
+        self._code_generation_timer.stop()
+        # Запускаем новый таймер на 300ms - код обновится через 300ms после последнего изменения
+        self._code_generation_timer.start(300)
+    
+    def _update_preview_code(self) -> None:
+        """Обновить код в панели предпросмотра"""
+        if not self._controller.project:
+            self.preview_panel.clear()
             return
-
-        self.preview_panel.set_code(code)
-        # Показываем панель предпросмотра, если она скрыта
-        if not self.preview_panel.isVisible():
-            self.btn_toggle_preview.setChecked(True)
-            self._on_toggle_preview(True)
+        
+        try:
+            code = self._controller.generate_script()
+            if code:
+                self.preview_panel.set_code(code)
+        except Exception as e:
+            # В случае ошибки генерации показываем сообщение об ошибке
+            error_msg = f"Ошибка генерации кода:\n{str(e)}"
+            self.preview_panel.set_code(error_msg)
     
     def _on_export_rpy(self) -> None:
         """Экспортировать проект в готовый проект Ren'Py"""
