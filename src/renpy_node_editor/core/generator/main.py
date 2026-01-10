@@ -240,8 +240,8 @@ def generate_block_chain(
             from renpy_node_editor.core.generator.blocks import generate_for
             lines.append(generate_for(block, indent, loop_body))
     else:
-        # IMAGE и CHARACTER блоки не генерируются в цепочке - они в секции определений
-        if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+        # IMAGE, CHARACTER, DEFINE и DEFAULT блоки не генерируются в цепочке - они в секции определений
+        if block.type in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT):
             # Пропускаем генерацию, но продолжаем цепочку
             pass
         elif block.type == BlockType.START:
@@ -369,8 +369,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         print(f"DEBUG: Нет START блоков в сцене {scene.name}, генерируем все блоки")
         indent = INDENT
         for block in sorted(scene.blocks, key=lambda b: (b.y, b.x)):
-            # Пропускаем IMAGE и CHARACTER блоки - они в секции определений
-            if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+            # Пропускаем IMAGE, CHARACTER, DEFINE и DEFAULT блоки - они в секции определений
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT):
                 continue
             print(f"DEBUG: Генерация блока {block.id} типа {block.type}")
             code = generate_block(block, indent, char_name_map, project_scenes, generated_labels, all_possible_labels)
@@ -493,7 +493,7 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             )
             
             for block in blocks_sorted:
-                if block.id not in visited_for_numbering and block.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START):
+                if block.id not in visited_for_numbering and block.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT, BlockType.START):
                     if reverse_connections:
                         input_blocks = reverse_connections.get(block.id, set())
                         if input_blocks:
@@ -540,8 +540,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             if not block:
                 continue
             
-            # Пропускаем IMAGE и CHARACTER блоки - они в секции определений
-            if block.type in (BlockType.IMAGE, BlockType.CHARACTER):
+            # Пропускаем IMAGE, CHARACTER, DEFINE и DEFAULT блоки - они в секции определений
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT):
                 continue
             
             # Определяем отступ: для START блока - без отступа (генерирует label), для остальных - с отступом
@@ -595,8 +595,8 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
             if not block:
                 continue
             
-            # START блоки, IMAGE, CHARACTER блоки уже обработаны
-            if block.type in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.START):
+            # START блоки, IMAGE, CHARACTER, DEFINE и DEFAULT блоки уже обработаны
+            if block.type in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT, BlockType.START):
                 visited.add(block_id)
                 continue
             
@@ -610,13 +610,13 @@ def generate_scene(scene: Scene, char_name_map: Optional[Dict[str, str]] = None,
         print(f"DEBUG: Обработка блоков без соединений в сцене {scene.name}")
         print(f"  Всего блоков в сцене: {len(scene.blocks)}")
         print(f"  Обработано блоков (visited): {len(visited)}")
-        unvisited_blocks = [b for b in scene.blocks if b.id not in visited and b.type not in (BlockType.IMAGE, BlockType.CHARACTER)]
+        unvisited_blocks = [b for b in scene.blocks if b.id not in visited and b.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT)]
         print(f"  Необработанных блоков (кроме IMAGE/CHARACTER): {len(unvisited_blocks)}")
         for block in unvisited_blocks:
             print(f"    Блок {block.id} типа {block.type}")
         
         for block in scene.blocks:
-            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER):
+            if block.id not in visited and block.type not in (BlockType.IMAGE, BlockType.CHARACTER, BlockType.DEFINE, BlockType.DEFAULT):
                 # START блоки генерируются на верхнем уровне (без отступа)
                 if block.type == BlockType.START:
                     from renpy_node_editor.core.generator.blocks import safe_get_str
@@ -782,11 +782,40 @@ def generate_definitions(project: Project) -> str:
                     character_blocks_processed.add(name)
                     char_code = generate_character(block, "")
                     if char_code:
-                        if not project.characters:  # Добавляем заголовок только если его еще нет
+                        if not project.characters and not lines:  # Добавляем заголовок только если его еще нет
                             lines.append("# Character Definitions (from blocks)\n")
                         lines.append(char_code)
     
     if character_blocks_processed:
+        lines.append("\n")
+    
+    # DEFINE и DEFAULT блоки - генерируем в секции определений
+    from renpy_node_editor.core.generator.blocks import generate_define, generate_default
+    define_blocks_processed = set()
+    default_blocks_processed = set()
+    
+    for scene in project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.DEFINE:
+                name = safe_get_str(block.params, "name")
+                if name and name not in define_blocks_processed:
+                    define_blocks_processed.add(name)
+                    define_code = generate_define(block, "")
+                    if define_code:
+                        if not lines or (not any("#" in line and "define" in line.lower() for line in lines[-5:])):
+                            lines.append("# Define Statements\n")
+                        lines.append(define_code)
+            elif block.type == BlockType.DEFAULT:
+                name = safe_get_str(block.params, "name")
+                if name and name not in default_blocks_processed:
+                    default_blocks_processed.add(name)
+                    default_code = generate_default(block, "")
+                    if default_code:
+                        if not lines or (not any("#" in line and "default" in line.lower() for line in lines[-5:])):
+                            lines.append("# Default Statements\n")
+                        lines.append(default_code)
+    
+    if define_blocks_processed or default_blocks_processed:
         lines.append("\n")
     
     return "".join(lines)
@@ -811,8 +840,17 @@ def generate_renpy_script(project: Project) -> str:
     # Создаем маппинг оригинальных имен на нормализованные
     char_name_map: Dict[str, str] = {}
     
-    # Собираем display_name из CHARACTER блоков
-    # BlockType уже импортирован в начале файла
+    # Собираем имена персонажей, которые уже определены в CHARACTER блоках
+    # (чтобы не дублировать их в автодетекции)
+    character_blocks_names = set()
+    for scene in project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.CHARACTER:
+                name = safe_get_str(block.params, "name")
+                if name:
+                    character_blocks_names.add(name)
+    
+    # Собираем display_name из CHARACTER блоков для автодетектированных персонажей
     character_display_names: Dict[str, str] = {}
     for scene in project.scenes:
         for block in scene.blocks:
@@ -822,28 +860,41 @@ def generate_renpy_script(project: Project) -> str:
                 if name and display_name:
                     character_display_names[name] = display_name
     
+    # Генерируем определения только для персонажей, которые:
+    # 1. Не определены в project.characters
+    # 2. Не определены в CHARACTER блоках (чтобы избежать дублирования)
     if characters:
-        lines.append("# Characters (auto-detected)\n")
+        auto_detected = []
         for char in sorted(characters):
-            # Check if already defined in project.characters
-            if char not in project.characters:
+            # Пропускаем персонажей, которые уже определены
+            if char not in project.characters and char not in character_blocks_names:
                 char_name = normalize_variable_name(char)
                 char_name_map[char] = char_name
                 # Используем display_name из CHARACTER блока, если есть
                 display_name = character_display_names.get(char, char)
                 if display_name:
                     display_name = display_name.replace("'", "\\'")
-                    lines.append(f"define {char_name} = Character('{display_name}')\n")
+                    auto_detected.append(f"define {char_name} = Character('{display_name}')\n")
                 else:
-                    lines.append(f"define {char_name} = Character('{char}')\n")
-        lines.append("\n")
-    elif not project.characters:
+                    auto_detected.append(f"define {char_name} = Character('{char}')\n")
+        
+        if auto_detected:
+            lines.append("# Characters (auto-detected)\n")
+            lines.extend(auto_detected)
+            lines.append("\n")
+    elif not project.characters and not character_blocks_names:
         lines.append("define narrator = Character('Narrator')\n\n")
     
     # Добавляем персонажей из project.characters в маппинг
     for name in project.characters.keys():
         normalized_name = normalize_variable_name(name)
         char_name_map[name] = normalized_name
+    
+    # Добавляем персонажей из CHARACTER блоков в маппинг (если еще не добавлены)
+    for name in character_blocks_names:
+        if name not in char_name_map:
+            normalized_name = normalize_variable_name(name)
+            char_name_map[name] = normalized_name
     
     # Собираем все метки, которые будут сгенерированы, чтобы избежать дубликатов
     generated_labels: Set[str] = set()
