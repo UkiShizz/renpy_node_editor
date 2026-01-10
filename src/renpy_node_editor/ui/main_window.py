@@ -424,11 +424,10 @@ class MainWindow(QMainWindow):
             return
 
         scene = project.scenes[0]  # пока просто первая
-        self.scene_manager.set_project(project)
-        self.scene_manager.set_current_scene(scene)
-        self.node_view.set_project_and_scene(project, scene)
-        self.preview_panel.clear()
-        self._update_window_title()
+        
+        # Используем _load_project для правильной загрузки проекта
+        # Это обеспечит переподключение сигналов и генерацию кода
+        self._load_project(project, scene)
         
         # Сбрасываем флаг изменений при открытии проекта
         self._mark_saved()
@@ -517,34 +516,26 @@ class MainWindow(QMainWindow):
         """Обновить код в панели предпросмотра"""
         # Проверяем, что preview_panel создан
         if not hasattr(self, 'preview_panel') or not self.preview_panel:
-            print("DEBUG: preview_panel не создан")
             return
         
         if not self._controller.project:
-            print("DEBUG: проект не загружен")
             self.preview_panel.clear()
             return
         
         try:
-            print(f"DEBUG: Генерирую код для проекта: {self._controller.project.name}")
             code = self._controller.generate_script()
-            print(f"DEBUG: Сгенерированный код, длина: {len(code) if code else 0}")
             # Всегда показываем код, даже если он пустой (для отладки)
             if code and code.strip():
                 self.preview_panel.set_code(code)
-                print("DEBUG: Код установлен в preview_panel")
             else:
                 # Если код пустой, показываем сообщение
                 msg = "# Код пуст. Добавьте блоки в сцену для генерации кода."
                 self.preview_panel.set_code(msg)
-                print(f"DEBUG: Код пустой, показано сообщение")
         except Exception as e:
             # В случае ошибки генерации показываем сообщение об ошибке
             import traceback
             error_msg = f"Ошибка генерации кода:\n{str(e)}\n\n{traceback.format_exc()}"
             self.preview_panel.set_code(error_msg)
-            print(f"ERROR in _update_preview_code: {e}")
-            traceback.print_exc()
     
     def _on_export_rpy(self) -> None:
         """Экспортировать проект в готовый проект Ren'Py"""
