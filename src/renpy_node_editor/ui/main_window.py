@@ -184,6 +184,8 @@ class MainWindow(QMainWindow):
         btn_export.setToolTip("Экспортировать проект в готовый проект Ren'Py (папку)")
         btn_center = QPushButton("🎯 Центр", self)
         btn_center.setToolTip("Вернуться в центр рабочей области (0, 0)")
+        btn_settings = QPushButton("⚙️ Настройки", self)
+        btn_settings.setToolTip("Открыть настройки редактора")
         self.btn_toggle_preview = QPushButton("📄 Код", self)
         self.btn_toggle_preview.setToolTip("Показать/скрыть панель предпросмотра кода")
         self.btn_toggle_preview.setCheckable(True)
@@ -195,11 +197,12 @@ class MainWindow(QMainWindow):
         btn_generate.clicked.connect(self._on_generate_code)
         btn_export.clicked.connect(self._on_export_rpy)
         btn_center.clicked.connect(self._on_center_view)
+        btn_settings.clicked.connect(self._on_open_settings)
         self.btn_toggle_preview.toggled.connect(self._on_toggle_preview)
 
         # Кнопка просмотра кода слева, остальные справа
         top_bar.addWidget(self.btn_toggle_preview)
-        for w in (btn_new, btn_open, self.btn_save, btn_generate, btn_export, btn_center):
+        for w in (btn_new, btn_open, self.btn_save, btn_generate, btn_export, btn_center, btn_settings):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
@@ -696,6 +699,13 @@ class MainWindow(QMainWindow):
     def _on_center_view(self) -> None:
         """Вернуться в центр рабочей области"""
         self.node_view.center_view()
+    
+    def _on_open_settings(self) -> None:
+        """Открыть диалог настроек"""
+        from renpy_node_editor.ui.settings_dialog import SettingsDialog
+        
+        dialog = SettingsDialog(self)
+        dialog.exec()
     
     def _on_scene_selected(self, scene: Scene) -> None:
         """Обработка выбора сцены"""

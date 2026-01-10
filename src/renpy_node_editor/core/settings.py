@@ -52,3 +52,18 @@ def save_splitter_sizes(sizes: list[int], splitter_name: str = "main") -> None:
     settings = load_settings()
     settings[f"splitter_sizes_{splitter_name}"] = sizes
     save_settings(settings)
+
+
+def get_renpy_sdk_path() -> Optional[Path]:
+    """Get saved Ren'Py SDK path"""
+    settings = load_settings()
+    path_str = settings.get("renpy_sdk_path")
+    if path_str:
+        return Path(path_str)
+    return None
+
+
+def get_setting(key: str, default: Any = None) -> Any:
+    """Get a setting value by key"""
+    settings = load_settings()
+    return settings.get(key, default)

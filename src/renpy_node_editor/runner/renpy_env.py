@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from renpy_node_editor.core.settings import get_renpy_sdk_path
+
 
 @dataclass
 class RenpyEnv:
@@ -36,7 +38,12 @@ def default_sdk_root() -> Path:
 
     Кладёшь туда распакованный SDK (как его выдаёт оф. инсталлятор),
     либо меняешь путь под себя.
+    
+    Сначала проверяет сохраненный путь из настроек.
     """
+    saved_path = get_renpy_sdk_path()
+    if saved_path:
+        return saved_path
     return Path(r"C:\RenPy\renpy-8.3.7")
 
 
