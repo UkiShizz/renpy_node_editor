@@ -848,30 +848,6 @@ class NodeScene(QGraphicsScene):
         
         # Удаляем визуально
         self.removeItem(connection_item)
-            # Убеждаемся, что используем правильный объект Scene из проекта
-            scene_to_use = self._scene_model
-            if self._project:
-                scene_in_project = self._project.find_scene(self._scene_model.id)
-                if scene_in_project:
-                    scene_to_use = scene_in_project
-            
-            # Удаляем connection из правильного объекта Scene
-            scene_to_use.remove_connection(connection_item.connection_id)
-            # Эмитим сигнал об изменении проекта
-            self.project_modified.emit()
-            
-            # Обновляем локальную ссылку, если это тот же объект
-            if self._scene_model.id == scene_to_use.id:
-                self._scene_model = scene_to_use
-            
-            # Отсоединяем от портов
-            if connection_item.src_port:
-                connection_item.src_port.remove_connection(connection_item)
-            if connection_item.dst_port:
-                connection_item.dst_port.remove_connection(connection_item)
-            
-            # Удаляем визуально
-            self.removeItem(connection_item)
     
     # ---- context menu ----
     
