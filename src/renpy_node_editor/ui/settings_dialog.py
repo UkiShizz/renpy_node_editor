@@ -182,10 +182,6 @@ class SettingsDialog(QDialog):
         display_tab = self._create_display_tab()
         tabs.addTab(display_tab, tr("ui.settings.tab.display", "Отображение"))
         
-        # Вкладка "Генерация кода"
-        generation_tab = self._create_generation_tab()
-        tabs.addTab(generation_tab, tr("ui.settings.tab.generation", "Генерация"))
-        
         # Вкладка "Язык"
         language_tab = self._create_language_tab()
         tabs.addTab(language_tab, tr("ui.settings.tab.language", "Язык"))
@@ -247,40 +243,6 @@ class SettingsDialog(QDialog):
         
         return widget
     
-    def _create_generation_tab(self) -> QWidget:
-        """Создать вкладку настроек генерации кода"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
-        
-        group = QGroupBox("Генерация Ren'Py кода", widget)
-        group_layout = QFormLayout(group)
-        group_layout.setSpacing(10)
-        
-        # Форматирование
-        indent_layout = QHBoxLayout()
-        self.indent_size = QSpinBox()
-        self.indent_size.setMinimum(2)
-        self.indent_size.setMaximum(8)
-        self.indent_size.setSuffix(" пробелов")
-        indent_layout.addWidget(self.indent_size)
-        indent_layout.addStretch()
-        group_layout.addRow("Размер отступа:", indent_layout)
-        
-        # Стиль отступов
-        indent_style_layout = QHBoxLayout()
-        self.indent_style = QComboBox()
-        self.indent_style.addItems(["Пробелы", "Табуляция"])
-        indent_style_layout.addWidget(self.indent_style)
-        indent_style_layout.addStretch()
-        group_layout.addRow("Стиль отступов:", indent_style_layout)
-        
-        layout.addWidget(group)
-        layout.addStretch()
-        
-        return widget
-    
     def _create_language_tab(self) -> QWidget:
         """Создать вкладку настроек языка"""
         widget = QWidget()
@@ -314,11 +276,6 @@ class SettingsDialog(QDialog):
         self.show_tooltips.setChecked(self.settings.get("show_tooltips", True))
         self.auto_center_on_load.setChecked(self.settings.get("auto_center_on_load", False))
         
-        # Генерация
-        self.indent_size.setValue(self.settings.get("indent_size", 4))
-        indent_style = self.settings.get("indent_style", "spaces")
-        self.indent_style.setCurrentIndex(0 if indent_style == "spaces" else 1)
-        
         # Язык
         current_lang = self.settings.get("language", "en")
         for i in range(self.language_combo.count()):
@@ -333,8 +290,6 @@ class SettingsDialog(QDialog):
         self.settings["grid_size"] = self.grid_size.value()
         self.settings["show_tooltips"] = self.show_tooltips.isChecked()
         self.settings["auto_center_on_load"] = self.auto_center_on_load.isChecked()
-        self.settings["indent_size"] = self.indent_size.value()
-        self.settings["indent_style"] = "spaces" if self.indent_style.currentIndex() == 0 else "tabs"
         
         # Сохраняем язык
         selected_lang = self.language_combo.currentData()
