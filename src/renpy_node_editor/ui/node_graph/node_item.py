@@ -121,108 +121,124 @@ class NodeItem(QGraphicsRectItem):
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         """Кастомная отрисовка блока с градиентами и тенями"""
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        
-        rect = self.rect()
-        
-        # Улучшенная тень с размытием
-        shadow_offset = 8 if self._is_selected else 3
-        shadow_opacity = 100 if self._is_selected else 40
-        
-        # Множественные тени для эффекта глубины
-        for i in range(3):
-            shadow_rect = rect.adjusted(
-                shadow_offset + i, 
-                shadow_offset + i, 
-                shadow_offset + i, 
-                shadow_offset + i
-            )
-            shadow_path = QPainterPath()
-            shadow_path.addRoundedRect(shadow_rect, self.CORNER_RADIUS, self.CORNER_RADIUS)
-            shadow_alpha = shadow_opacity - (i * 20)
-            if shadow_alpha > 0:
-                painter.fillPath(shadow_path, QColor(0, 0, 0, shadow_alpha))
-        
-        # Основной блок
-        main_path = QPainterPath()
-        main_path.addRoundedRect(rect, self.CORNER_RADIUS, self.CORNER_RADIUS)
-        
-        # Подсветка фона при выделении
-        if self._is_selected:
-            # Внешнее свечение
-            glow_path = QPainterPath()
-            glow_rect = rect.adjusted(-4, -4, 4, 4)
-            glow_path.addRoundedRect(glow_rect, self.CORNER_RADIUS + 4, self.CORNER_RADIUS + 4)
-            glow_gradient = QLinearGradient(glow_rect.topLeft(), glow_rect.bottomLeft())
-            highlight_color = QColor(74, 158, 255, 60)  # #4A9EFF с прозрачностью
-            glow_gradient.setColorAt(0, highlight_color)
-            glow_gradient.setColorAt(0.5, QColor(74, 158, 255, 40))
-            glow_gradient.setColorAt(1, highlight_color)
-            painter.fillPath(glow_path, QBrush(glow_gradient))
-        
-        # Улучшенный градиент для фона с большей глубиной
-        if self._is_selected:
-            # Более яркий градиент для выделенного блока
-            gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-            gradient.setColorAt(0, self._light_color.lighter(115))
-            gradient.setColorAt(0.5, self._main_color.lighter(105))
-            gradient.setColorAt(1, self._dark_color.darker(105))
-        else:
-            gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-            gradient.setColorAt(0, self._light_color.lighter(105))
-            gradient.setColorAt(0.5, self._main_color)
-            gradient.setColorAt(1, self._dark_color.darker(110))
-        painter.fillPath(main_path, QBrush(gradient))
-        
-        # Заголовок с другим градиентом
-        header_rect = QRectF(rect.x(), rect.y(), rect.width(), self.HEADER_HEIGHT)
-        header_path = QPainterPath()
-        header_path.addRoundedRect(header_rect, self.CORNER_RADIUS, self.CORNER_RADIUS)
-        header_path.addRect(header_rect.x(), header_rect.y() + self.CORNER_RADIUS, 
-                           header_rect.width(), header_rect.height() - self.CORNER_RADIUS)
-        
-        # Более яркий градиент для заголовка
-        if self._is_selected:
-            header_gradient = QLinearGradient(header_rect.topLeft(), header_rect.bottomLeft())
-            header_gradient.setColorAt(0, self._main_color.lighter(130))
-            header_gradient.setColorAt(0.5, self._main_color.lighter(120))
-            header_gradient.setColorAt(1, self._main_color.lighter(110))
-        else:
-            header_gradient = QLinearGradient(header_rect.topLeft(), header_rect.bottomLeft())
-            header_gradient.setColorAt(0, self._main_color.lighter(120))
-            header_gradient.setColorAt(0.5, self._main_color.lighter(110))
-            header_gradient.setColorAt(1, self._main_color)
-        painter.fillPath(header_path, QBrush(header_gradient))
-        
-        # Обводка с эффектом свечения при выделении
-        pen_width = 4 if self._is_selected else 2
-        if self._is_selected:
-            # Внешняя обводка (свечение)
-            glow_color = QColor(74, 158, 255, 150)  # #4A9EFF
-            glow_pen = QPen(glow_color, pen_width + 3)
-            painter.setPen(glow_pen)
+        try:
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            
+            rect = self.rect()
+            
+            # Обновляем состояние выделения из базового класса
+            try:
+                is_selected = self.isSelected()
+                self._is_selected = is_selected
+            except (RuntimeError, AttributeError):
+                # Если не можем получить состояние, используем сохраненное
+                pass
+            
+            # Улучшенная тень с размытием
+            shadow_offset = 8 if self._is_selected else 3
+            shadow_opacity = 100 if self._is_selected else 40
+            
+            # Множественные тени для эффекта глубины
+            for i in range(3):
+                shadow_rect = rect.adjusted(
+                    shadow_offset + i, 
+                    shadow_offset + i, 
+                    shadow_offset + i, 
+                    shadow_offset + i
+                )
+                shadow_path = QPainterPath()
+                shadow_path.addRoundedRect(shadow_rect, self.CORNER_RADIUS, self.CORNER_RADIUS)
+                shadow_alpha = shadow_opacity - (i * 20)
+                if shadow_alpha > 0:
+                    painter.fillPath(shadow_path, QColor(0, 0, 0, shadow_alpha))
+            
+            # Основной блок
+            main_path = QPainterPath()
+            main_path.addRoundedRect(rect, self.CORNER_RADIUS, self.CORNER_RADIUS)
+            
+            # Подсветка фона при выделении
+            if self._is_selected:
+                # Внешнее свечение
+                glow_path = QPainterPath()
+                glow_rect = rect.adjusted(-4, -4, 4, 4)
+                glow_path.addRoundedRect(glow_rect, self.CORNER_RADIUS + 4, self.CORNER_RADIUS + 4)
+                glow_gradient = QLinearGradient(glow_rect.topLeft(), glow_rect.bottomLeft())
+                highlight_color = QColor(74, 158, 255, 60)  # #4A9EFF с прозрачностью
+                glow_gradient.setColorAt(0, highlight_color)
+                glow_gradient.setColorAt(0.5, QColor(74, 158, 255, 40))
+                glow_gradient.setColorAt(1, highlight_color)
+                painter.fillPath(glow_path, QBrush(glow_gradient))
+            
+            # Улучшенный градиент для фона с большей глубиной
+            if self._is_selected:
+                # Более яркий градиент для выделенного блока
+                gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+                # lighter/darker принимают значения 0-255, где 100 = без изменений
+                gradient.setColorAt(0, self._light_color.lighter(115))
+                gradient.setColorAt(0.5, self._main_color.lighter(110))
+                gradient.setColorAt(1, self._dark_color.lighter(95))
+            else:
+                gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+                gradient.setColorAt(0, self._light_color.lighter(105))
+                gradient.setColorAt(0.5, self._main_color)
+                gradient.setColorAt(1, self._dark_color.darker(110))
+            painter.fillPath(main_path, QBrush(gradient))
+            
+            # Заголовок с другим градиентом
+            header_rect = QRectF(rect.x(), rect.y(), rect.width(), self.HEADER_HEIGHT)
+            header_path = QPainterPath()
+            header_path.addRoundedRect(header_rect, self.CORNER_RADIUS, self.CORNER_RADIUS)
+            header_path.addRect(header_rect.x(), header_rect.y() + self.CORNER_RADIUS, 
+                               header_rect.width(), header_rect.height() - self.CORNER_RADIUS)
+            
+            # Более яркий градиент для заголовка
+            if self._is_selected:
+                header_gradient = QLinearGradient(header_rect.topLeft(), header_rect.bottomLeft())
+                header_gradient.setColorAt(0, self._main_color.lighter(130))
+                header_gradient.setColorAt(0.5, self._main_color.lighter(120))
+                header_gradient.setColorAt(1, self._main_color.lighter(110))
+            else:
+                header_gradient = QLinearGradient(header_rect.topLeft(), header_rect.bottomLeft())
+                header_gradient.setColorAt(0, self._main_color.lighter(120))
+                header_gradient.setColorAt(0.5, self._main_color.lighter(110))
+                header_gradient.setColorAt(1, self._main_color)
+            painter.fillPath(header_path, QBrush(header_gradient))
+            
+            # Обводка с эффектом свечения при выделении
+            pen_width = 4 if self._is_selected else 2
+            if self._is_selected:
+                # Внешняя обводка (свечение)
+                glow_color = QColor(74, 158, 255, 150)  # #4A9EFF
+                glow_pen = QPen(glow_color, pen_width + 3)
+                painter.setPen(glow_pen)
+                painter.drawPath(main_path)
+                # Средняя обводка
+                mid_pen = QPen(QColor(255, 255, 255, 180), pen_width + 1)
+                painter.setPen(mid_pen)
+                painter.drawPath(main_path)
+                # Основная обводка
+                border_color = QColor("#FFFFFF")
+            else:
+                border_color = self._main_color.darker(120)
+            
+            painter.setPen(QPen(border_color, pen_width))
             painter.drawPath(main_path)
-            # Средняя обводка
-            mid_pen = QPen(QColor(255, 255, 255, 180), pen_width + 1)
-            painter.setPen(mid_pen)
-            painter.drawPath(main_path)
-            # Основная обводка
-            border_color = QColor("#FFFFFF")
-        else:
-            border_color = self._main_color.darker(120)
-        
-        painter.setPen(QPen(border_color, pen_width))
-        painter.drawPath(main_path)
-        
-        # Разделительная линия под заголовком с градиентом
-        line_y = self.HEADER_HEIGHT
-        line_gradient = QLinearGradient(rect.x() + 8, line_y, rect.width() - 8, line_y)
-        line_gradient.setColorAt(0, QColor(0, 0, 0, 0))
-        line_gradient.setColorAt(0.5, self._main_color.darker(150))
-        line_gradient.setColorAt(1, QColor(0, 0, 0, 0))
-        painter.setPen(QPen(QBrush(line_gradient), 1.5))
-        painter.drawLine(rect.x() + 8, line_y, rect.width() - 8, line_y)
+            
+            # Разделительная линия под заголовком с градиентом
+            line_y = self.HEADER_HEIGHT
+            line_gradient = QLinearGradient(rect.x() + 8, line_y, rect.width() - 8, line_y)
+            line_gradient.setColorAt(0, QColor(0, 0, 0, 0))
+            line_gradient.setColorAt(0.5, self._main_color.darker(150))
+            line_gradient.setColorAt(1, QColor(0, 0, 0, 0))
+            painter.setPen(QPen(QBrush(line_gradient), 1.5))
+            painter.drawLine(rect.x() + 8, line_y, rect.width() - 8, line_y)
+        except Exception as e:
+            # В случае ошибки используем базовую отрисовку
+            import traceback
+            print(f"Error in NodeItem.paint: {e}")
+            traceback.print_exc()
+            super().paint(painter, option, widget)
 
     def _create_ports(self) -> None:
         """Create input port on left and output port(s) on right"""

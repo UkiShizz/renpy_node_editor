@@ -665,25 +665,41 @@ class NodeScene(QGraphicsScene):
             return
         
         # Подсветка соединений, связанных с выбранными блоками
-        # Сначала сбрасываем подсветку всех соединений
-        for item in self.items():
-            if isinstance(item, ConnectionItem):
-                if hasattr(item, 'set_highlighted'):
-                    item.set_highlighted(False)
-                    item.update()
-        
-        # Подсвечиваем соединения, связанные с выбранными блоками
         try:
+            # Сначала сбрасываем подсветку всех соединений
+            items_list = list(self.items())  # Создаем копию списка для безопасной итерации
+            for item in items_list:
+                if isinstance(item, ConnectionItem):
+                    try:
+                        if hasattr(item, 'set_highlighted'):
+                            item.set_highlighted(False)
+                            item.update()
+                    except (RuntimeError, AttributeError):
+                        continue
+            
+            # Подсвечиваем соединения, связанные с выбранными блоками
             selected_items = self.selectedItems()
             selected_nodes = [item for item in selected_items if isinstance(item, NodeItem)]
             
             for node_item in selected_nodes:
-                # Подсвечиваем все соединения этого блока
-                for port in node_item.inputs + node_item.outputs:
-                    for connection in port.connections:
-                        if hasattr(connection, 'set_highlighted'):
-                            connection.set_highlighted(True)
-                            connection.update()
+                try:
+                    # Проверяем, что узел еще существует
+                    if not hasattr(node_item, 'inputs') or not hasattr(node_item, 'outputs'):
+                        continue
+                    
+                    # Подсвечиваем все соединения этого блока
+                    for port in list(node_item.inputs) + list(node_item.outputs):
+                        if not hasattr(port, 'connections'):
+                            continue
+                        for connection in list(port.connections):
+                            try:
+                                if hasattr(connection, 'set_highlighted'):
+                                    connection.set_highlighted(True)
+                                    connection.update()
+                            except (RuntimeError, AttributeError):
+                                continue
+                except (RuntimeError, AttributeError):
+                    continue
         except (RuntimeError, AttributeError):
             pass
         
