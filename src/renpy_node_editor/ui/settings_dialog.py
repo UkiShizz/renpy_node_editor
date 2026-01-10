@@ -258,10 +258,6 @@ class SettingsDialog(QDialog):
         group_layout = QFormLayout(group)
         group_layout.setSpacing(10)
         
-        # Комментарии
-        self.add_comments = QCheckBox("Добавлять комментарии в сгенерированный код")
-        group_layout.addRow("", self.add_comments)
-        
         # Форматирование
         indent_layout = QHBoxLayout()
         self.indent_size = QSpinBox()
@@ -319,7 +315,6 @@ class SettingsDialog(QDialog):
         self.auto_center_on_load.setChecked(self.settings.get("auto_center_on_load", False))
         
         # Генерация
-        self.add_comments.setChecked(self.settings.get("add_comments", False))
         self.indent_size.setValue(self.settings.get("indent_size", 4))
         indent_style = self.settings.get("indent_style", "spaces")
         self.indent_style.setCurrentIndex(0 if indent_style == "spaces" else 1)
@@ -338,7 +333,6 @@ class SettingsDialog(QDialog):
         self.settings["grid_size"] = self.grid_size.value()
         self.settings["show_tooltips"] = self.show_tooltips.isChecked()
         self.settings["auto_center_on_load"] = self.auto_center_on_load.isChecked()
-        self.settings["add_comments"] = self.add_comments.isChecked()
         self.settings["indent_size"] = self.indent_size.value()
         self.settings["indent_style"] = "spaces" if self.indent_style.currentIndex() == 0 else "tabs"
         
