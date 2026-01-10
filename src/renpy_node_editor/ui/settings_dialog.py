@@ -12,7 +12,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.settings import load_settings, save_settings
-from renpy_node_editor.runner.renpy_env import default_sdk_root, RenpyEnv
 from renpy_node_editor.core.i18n import tr, get_language, set_language, reload_translations
 from PySide6.QtCore import Signal
 
@@ -179,10 +178,6 @@ class SettingsDialog(QDialog):
         tabs = QTabWidget(self)
         layout.addWidget(tabs)
         
-        # Вкладка "Ren'Py SDK"
-        renpy_tab = self._create_renpy_tab()
-        tabs.addTab(renpy_tab, tr("ui.settings.tab.sdk", "Ren'Py SDK"))
-        
         # Вкладка "Отображение"
         display_tab = self._create_display_tab()
         tabs.addTab(display_tab, tr("ui.settings.tab.display", "Отображение"))
@@ -213,39 +208,6 @@ class SettingsDialog(QDialog):
         buttons_layout.addWidget(btn_save)
         
         layout.addLayout(buttons_layout)
-    
-    def _create_renpy_tab(self) -> QWidget:
-        """Создать вкладку настроек Ren'Py SDK"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
-        
-        group = QGroupBox("Путь к Ren'Py SDK", widget)
-        group_layout = QFormLayout(group)
-        group_layout.setSpacing(10)
-        
-        # Путь к SDK
-        path_layout = QHBoxLayout()
-        self.renpy_sdk_path = QLineEdit()
-        self.renpy_sdk_path.setPlaceholderText("C:\\RenPy\\renpy-8.3.7")
-        path_layout.addWidget(self.renpy_sdk_path)
-        
-        btn_browse = QPushButton("Обзор...", group)
-        btn_browse.clicked.connect(self._on_browse_renpy_sdk)
-        path_layout.addWidget(btn_browse)
-        
-        group_layout.addRow("Путь к SDK:", path_layout)
-        
-        # Информация о валидности
-        self.renpy_status_label = QLabel("")
-        self.renpy_status_label.setWordWrap(True)
-        group_layout.addRow("", self.renpy_status_label)
-        
-        layout.addWidget(group)
-        layout.addStretch()
-        
-        return widget
     
     def _create_display_tab(self) -> QWidget:
         """Создать вкладку настроек отображения"""
@@ -382,11 +344,6 @@ class SettingsDialog(QDialog):
     
     def _load_current_settings(self) -> None:
         """Загрузить текущие настройки в UI"""
-        # Ren'Py SDK
-        renpy_path = self.settings.get("renpy_sdk_path", str(default_sdk_root()))
-        self.renpy_sdk_path.setText(renpy_path)
-        self._validate_renpy_path()
-        
         # Отображение
         self.show_grid.setChecked(self.settings.get("show_grid", True))
         self.grid_size.setValue(self.settings.get("grid_size", 20))
@@ -410,44 +367,6 @@ class SettingsDialog(QDialog):
                 self.language_combo.setCurrentIndex(i)
                 break
     
-    def _validate_renpy_path(self) -> None:
-        """Проверить валидность пути к Ren'Py SDK"""
-        path_str = self.renpy_sdk_path.text().strip()
-        if not path_str:
-            self.renpy_status_label.setText("⚠️ Путь не указан")
-            self.renpy_status_label.setStyleSheet("color: #FFA500;")
-            return
-        
-        path = Path(path_str)
-        env = RenpyEnv(sdk_root=path)
-        
-        if env.is_valid():
-            self.renpy_status_label.setText("✅ Путь к Ren'Py SDK корректен")
-            self.renpy_status_label.setStyleSheet("color: #4CAF50;")
-        else:
-            self.renpy_status_label.setText(
-                "❌ Неверный путь к Ren'Py SDK\n"
-                "Убедитесь, что в указанной папке находятся файлы renpy.py и python.exe"
-            )
-            self.renpy_status_label.setStyleSheet("color: #F44336;")
-    
-    def _on_browse_renpy_sdk(self) -> None:
-        """Открыть диалог выбора папки Ren'Py SDK"""
-        current_path = self.renpy_sdk_path.text().strip()
-        if not current_path:
-            current_path = str(default_sdk_root())
-        
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Выберите папку Ren'Py SDK",
-            current_path,
-            QFileDialog.Option.ShowDirsOnly
-        )
-        
-        if folder:
-            self.renpy_sdk_path.setText(folder)
-            self._validate_renpy_path()
-    
     def _on_browse_export_path(self) -> None:
         """Открыть диалог выбора папки для экспорта"""
         current_path = self.default_export_path.text().strip()
@@ -466,23 +385,7 @@ class SettingsDialog(QDialog):
     
     def _on_save(self) -> None:
         """Сохранить настройки"""
-        # Проверяем путь к Ren'Py SDK
-        renpy_path = self.renpy_sdk_path.text().strip()
-        if renpy_path:
-            env = RenpyEnv(sdk_root=Path(renpy_path))
-            if not env.is_valid():
-                reply = QMessageBox.question(
-                    self,
-                    "Неверный путь к Ren'Py SDK",
-                    "Указанный путь к Ren'Py SDK неверен. Сохранить настройки всё равно?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
-                )
-                if reply == QMessageBox.No:
-                    return
-        
         # Сохраняем настройки
-        self.settings["renpy_sdk_path"] = renpy_path
         self.settings["show_grid"] = self.show_grid.isChecked()
         self.settings["grid_size"] = self.grid_size.value()
         self.settings["show_tooltips"] = self.show_tooltips.isChecked()
