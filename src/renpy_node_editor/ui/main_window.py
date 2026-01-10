@@ -26,6 +26,7 @@ from renpy_node_editor.ui.preview_panel import PreviewPanel
 from renpy_node_editor.ui.block_properties_panel import BlockPropertiesPanel
 from renpy_node_editor.ui.scene_manager_panel import SceneManagerPanel
 from renpy_node_editor.core.settings import get_splitter_sizes, save_splitter_sizes
+from renpy_node_editor.ui.styles import get_main_window_style
 
 
 class MainWindow(QMainWindow):
@@ -133,43 +134,7 @@ class MainWindow(QMainWindow):
 
     def _apply_style(self) -> None:
         """Применить современный стиль к окну"""
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #1E1E1E;
-            }
-            QWidget {
-                background-color: #1E1E1E;
-                color: #E0E0E0;
-            }
-            QPushButton {
-                background-color: #3A3A3A;
-                border: 2px solid #4A4A4A;
-                border-radius: 6px;
-                padding: 8px 16px;
-                color: #E0E0E0;
-                font-weight: bold;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background-color: #4A4A4A;
-                border-color: #5A5A5A;
-            }
-            QPushButton:pressed {
-                background-color: #2A2A2A;
-            }
-            QLabel {
-                color: #E0E0E0;
-            }
-            QSplitter::handle {
-                background-color: #2A2A2A;
-            }
-            QSplitter::handle:horizontal {
-                width: 3px;
-            }
-            QSplitter::handle:vertical {
-                height: 3px;
-            }
-        """)
+        self.setStyleSheet(get_main_window_style())
 
     # ---- UI ----
 

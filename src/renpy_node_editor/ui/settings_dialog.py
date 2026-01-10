@@ -14,6 +14,7 @@ from PySide6.QtGui import QFont
 from renpy_node_editor.core.settings import load_settings, save_settings
 from renpy_node_editor.core.i18n import tr, get_language, set_language, reload_translations
 from PySide6.QtCore import Signal
+from renpy_node_editor.ui.styles import get_dialog_style
 
 
 class SettingsDialog(QDialog):
@@ -39,134 +40,7 @@ class SettingsDialog(QDialog):
     
     def _apply_style(self) -> None:
         """Применить стиль к диалогу"""
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1E1E1E;
-                color: #E0E0E0;
-            }
-            QLabel {
-                color: #E0E0E0;
-                font-size: 11px;
-            }
-            QLineEdit {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E0E0E0;
-                font-size: 11px;
-            }
-            QLineEdit:focus {
-                border-color: #4A90E2;
-                background-color: #2F2F2F;
-            }
-            QPushButton {
-                background-color: #3A3A3A;
-                border: 2px solid #4A4A4A;
-                border-radius: 6px;
-                padding: 8px 16px;
-                color: #E0E0E0;
-                font-weight: bold;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background-color: #4A4A4A;
-                border-color: #5A5A5A;
-            }
-            QPushButton:pressed {
-                background-color: #2A2A2A;
-            }
-            QPushButton#primaryButton {
-                background-color: #4A90E2;
-                border: 2px solid #5BA0F2;
-                color: #FFFFFF;
-            }
-            QPushButton#primaryButton:hover {
-                background-color: #5BA0F2;
-                border-color: #6BB0FF;
-            }
-            QGroupBox {
-                border: 2px solid #3A3A3A;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 12px;
-                font-weight: bold;
-                font-size: 12px;
-                color: #E0E0E0;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-            QCheckBox {
-                color: #E0E0E0;
-                font-size: 11px;
-                spacing: 6px;
-            }
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 2px solid #3A3A3A;
-                border-radius: 3px;
-                background-color: #2A2A2A;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #4A90E2;
-                border-color: #6BA3F0;
-            }
-            QSpinBox {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E0E0E0;
-                font-size: 11px;
-            }
-            QSpinBox:focus {
-                border-color: #4A90E2;
-            }
-            QTabWidget::pane {
-                border: 1px solid #3A3A3A;
-                background-color: #252525;
-                border-radius: 4px;
-            }
-            QTabBar::tab {
-                background-color: #2A2A2A;
-                color: #E0E0E0;
-                padding: 8px 16px;
-                margin-right: 2px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-            }
-            QTabBar::tab:selected {
-                background-color: #4A90E2;
-                color: #FFFFFF;
-            }
-            QTabBar::tab:hover {
-                background-color: #3A3A3A;
-            }
-            QComboBox {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E0E0E0;
-                font-size: 11px;
-            }
-            QComboBox:focus {
-                border-color: #4A90E2;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid #E0E0E0;
-            }
-        """)
+        self.setStyleSheet(get_dialog_style())
     
     def _build_ui(self) -> None:
         """Построить UI диалога"""

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter, QPolygonF
+from PySide6.QtGui import QPainterPath, QPen, QColor, QPainter, QPolygonF, QLinearGradient, QBrush
 from PySide6.QtWidgets import QGraphicsPathItem
 import math
 
@@ -23,11 +23,15 @@ class ConnectionItem(QGraphicsPathItem):
 
         self.setZValue(-1)
         
-        # Более яркая и толстая линия
-        self._pen = QPen(QColor("#A0A0A0"), 3)
+        # Улучшенная линия с градиентом
+        self._pen = QPen(QColor("#6A6A6A"), 2.5)
         self._pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         self._pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         self.setPen(self._pen)
+        
+        # Цвета для градиента
+        self._base_color = QColor("#6A6A6A")
+        self._highlight_color = QColor("#4A9EFF")
 
         self._tmp_end = None
         self._arrow_end = None
@@ -127,24 +131,49 @@ class ConnectionItem(QGraphicsPathItem):
     def paint(self, painter: QPainter, option, widget=None) -> None:
         """Кастомная отрисовка с эффектом свечения и стрелкой"""
         painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
         
-        # Рисуем тень
-        shadow_pen = QPen(QColor(0, 0, 0, 40), 5)
+        path = self.path()
+        if path.isEmpty():
+            return
+        
+        # Рисуем тень для глубины
+        shadow_pen = QPen(QColor(0, 0, 0, 50), 4)
         shadow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        shadow_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(shadow_pen)
-        painter.drawPath(self.path())
+        painter.drawPath(path)
         
-        # Основная линия
-        super().paint(painter, option, widget)
+        # Основная линия с градиентом
+        if self.dst_port is not None:
+            # Установленное соединение - используем градиент
+            gradient = QLinearGradient(path.pointAtPercent(0), path.pointAtPercent(1))
+            gradient.setColorAt(0, self._base_color.lighter(130))
+            gradient.setColorAt(0.5, self._highlight_color)
+            gradient.setColorAt(1, self._highlight_color.lighter(110))
+            
+            pen = QPen(QBrush(gradient), 3)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
+        else:
+            # Временное соединение - обычная линия
+            temp_pen = QPen(self._base_color, 2.5)
+            temp_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            temp_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(temp_pen)
+        
+        # Рисуем путь
+        painter.drawPath(path)
         
         # Рисуем стрелку на конце соединения
         if self._arrow_end is not None and self._arrow_direction is not None:
             self._draw_arrow(painter, self._arrow_end, self._arrow_direction)
     
     def _draw_arrow(self, painter: QPainter, end_point: QPointF, direction: tuple[float, float]) -> None:
-        """Нарисовать стрелку в конце соединения"""
-        arrow_size = 10
-        arrow_width = 6
+        """Нарисовать стрелку в конце соединения с улучшенным дизайном"""
+        arrow_size = 12
+        arrow_width = 7
         
         dx, dy = direction
         
@@ -172,10 +201,22 @@ class ConnectionItem(QGraphicsPathItem):
         # Рисуем стрелку
         arrow_polygon = QPolygonF([arrow_tip, arrow_left, arrow_right])
         
-        # Используем тот же цвет, что и у линии
-        arrow_color = self._pen.color()
-        painter.setBrush(arrow_color)
-        painter.setPen(Qt.NoPen)
+        # Определяем цвет стрелки
+        if self.dst_port is not None:
+            arrow_color = self._highlight_color
+        else:
+            arrow_color = self._pen.color()
+        
+        # Рисуем свечение вокруг стрелки
+        if self.dst_port is not None:
+            glow_pen = QPen(QColor(arrow_color.red(), arrow_color.green(), arrow_color.blue(), 80), 5)
+            painter.setPen(glow_pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPolygon(arrow_polygon)
+        
+        # Основная стрелка
+        painter.setBrush(QBrush(arrow_color))
+        painter.setPen(QPen(arrow_color.darker(120), 1))
         painter.drawPolygon(arrow_polygon)
 
     def detach_from(self, port):

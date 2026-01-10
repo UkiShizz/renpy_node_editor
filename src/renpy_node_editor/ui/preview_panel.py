@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QColor, QTextCursor
 
 from renpy_node_editor.core.i18n import tr
+from renpy_node_editor.ui.styles import get_panel_style, get_code_editor_style
 
 
 class PreviewPanel(QWidget):
@@ -23,24 +24,7 @@ class PreviewPanel(QWidget):
         super().__init__(parent)
 
         # Применяем стиль
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #252525;
-                color: #E0E0E0;
-            }
-            QPlainTextEdit {
-                background-color: #1E1E1E;
-                border: 2px solid #3A3A3A;
-                border-radius: 6px;
-                color: #E0E0E0;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 10px;
-                padding: 8px;
-            }
-            QLabel {
-                color: #E0E0E0;
-            }
-        """)
+        self.setStyleSheet(get_panel_style() + get_code_editor_style())
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

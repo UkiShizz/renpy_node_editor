@@ -13,6 +13,7 @@ from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType
 from renpy_node_editor.core.i18n import tr
+from renpy_node_editor.ui.styles import get_panel_style, get_list_widget_style, get_dialog_style
 from renpy_node_editor.core.model import Project
 from renpy_node_editor.ui.tooltips import (
     get_parameter_tooltip,
@@ -81,88 +82,7 @@ class BlockPropertiesPanel(QWidget):
         self._param_widgets: dict[str, QWidget] = {}
         
         # Применяем стиль
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #252525;
-                color: #E0E0E0;
-            }
-            QLabel {
-                color: #E0E0E0;
-                font-size: 10px;
-                padding: 2px;
-            }
-            QLineEdit {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E0E0E0;
-                font-size: 10px;
-            }
-            QLineEdit:focus {
-                border-color: #4A90E2;
-                background-color: #2F2F2F;
-            }
-            QTextEdit {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E0E0E0;
-                font-size: 10px;
-                font-family: 'Consolas', monospace;
-            }
-            QTextEdit:focus {
-                border-color: #4A90E2;
-                background-color: #2F2F2F;
-            }
-            QCheckBox {
-                color: #E0E0E0;
-                font-size: 10px;
-                spacing: 6px;
-            }
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-                border: 2px solid #3A3A3A;
-                border-radius: 3px;
-                background-color: #2A2A2A;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #4A90E2;
-                border-color: #6BA3F0;
-            }
-            QPushButton {
-                background-color: #4A90E2;
-                border: none;
-                border-radius: 6px;
-                padding: 10px;
-                color: #FFFFFF;
-                font-weight: bold;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background-color: #5BA0F2;
-            }
-            QPushButton:pressed {
-                background-color: #3A80D2;
-            }
-            QListWidget {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                color: #E0E0E0;
-                font-size: 10px;
-            }
-            QListWidget::item {
-                padding: 4px;
-                border-radius: 2px;
-            }
-            QListWidget::item:selected {
-                background-color: #4A90E2;
-                color: #FFFFFF;
-            }
-        """)
+        self.setStyleSheet(get_panel_style() + get_list_widget_style() + get_dialog_style())
         
         self.init_ui()
 

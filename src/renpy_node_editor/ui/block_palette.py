@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from renpy_node_editor.core.model import BlockType
 from renpy_node_editor.core.i18n import tr
 from renpy_node_editor.ui.tooltips import get_block_tooltip
+from renpy_node_editor.ui.styles import get_list_widget_style
 
 
 MIME_NODE_TYPE = "application/x-renpy-node-type"
@@ -37,30 +38,19 @@ class BlockPalette(QListWidget):
         self.setAlternatingRowColors(True)
         
         # Стиль палитры
-        self.setStyleSheet("""
+        self.setStyleSheet(get_list_widget_style() + """
             QListWidget {
-                background-color: #252525;
-                border: 2px solid #3A3A3A;
                 border-radius: 8px;
-                color: #E0E0E0;
-                font-size: 11px;
                 padding: 4px;
             }
             QListWidget::item {
-                background-color: #2A2A2A;
-                border: 1px solid #3A3A3A;
+                border: 1px solid transparent;
                 border-radius: 4px;
                 padding: 8px;
                 margin: 2px;
             }
             QListWidget::item:hover {
-                background-color: #3A3A3A;
-                border-color: #4A90E2;
-            }
-            QListWidget::item:selected {
-                background-color: #4A90E2;
-                border-color: #6BA3F0;
-                color: #FFFFFF;
+                border-color: #4A9EFF;
             }
         """)
 

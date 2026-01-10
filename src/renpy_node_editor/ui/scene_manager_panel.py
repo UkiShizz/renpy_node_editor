@@ -12,6 +12,7 @@ from PySide6.QtGui import QFont, QColor
 
 from renpy_node_editor.core.model import Project, Scene
 from renpy_node_editor.core.i18n import tr
+from renpy_node_editor.ui.styles import get_panel_style, get_list_widget_style
 
 
 class SceneManagerPanel(QWidget):
@@ -36,51 +37,7 @@ class SceneManagerPanel(QWidget):
         self._current_scene: Optional[Scene] = None
         self._is_updating_selection = False  # Флаг для предотвращения рекурсивных вызовов
         
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #252525;
-                color: #E0E0E0;
-            }
-            QLabel {
-                color: #E0E0E0;
-                font-size: 11px;
-                padding: 4px;
-            }
-            QPushButton {
-                background-color: #3A3A3A;
-                border: 2px solid #4A4A4A;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #E0E0E0;
-                font-weight: bold;
-                font-size: 10px;
-            }
-            QPushButton:hover {
-                background-color: #4A4A4A;
-                border-color: #5A5A5A;
-            }
-            QPushButton:pressed {
-                background-color: #2A2A2A;
-            }
-            QListWidget {
-                background-color: #2A2A2A;
-                border: 2px solid #3A3A3A;
-                border-radius: 4px;
-                color: #E0E0E0;
-                font-size: 10px;
-            }
-            QListWidget::item {
-                padding: 6px;
-                border-radius: 2px;
-            }
-            QListWidget::item:selected {
-                background-color: #4A90E2;
-                color: #FFFFFF;
-            }
-            QListWidget::item:hover {
-                background-color: #3A3A3A;
-            }
-        """)
+        self.setStyleSheet(get_panel_style() + get_list_widget_style())
         
         self.init_ui()
     
