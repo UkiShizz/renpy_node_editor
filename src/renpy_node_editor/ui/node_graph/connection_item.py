@@ -21,9 +21,9 @@ class ConnectionItem(QGraphicsPathItem):
         self.dst_port = dst_port
         self.connection_id = connection_id  # ID связи в модели
 
-        # Устанавливаем zValue выше блоков, чтобы соединения можно было кликать
-        # Но ниже портов, чтобы порты были доступны для создания соединений
-        self.setZValue(0)
+        # Устанавливаем zValue ниже блоков, чтобы соединения не перекрывали их визуально
+        # Но соединения все равно кликабельны благодаря улучшенной обработке кликов
+        self.setZValue(-1)
         
         # Делаем соединение выделяемым
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -99,6 +99,9 @@ class ConnectionItem(QGraphicsPathItem):
         if not self.src_port:
             return
         
+        # Уведомляем сцену об изменении геометрии перед изменением пути
+        self.prepareGeometryChange()
+        
         # Проверяем, что порт еще существует (не удален)
         try:
             p1: QPointF = self.src_port.scenePos()
@@ -117,13 +120,19 @@ class ConnectionItem(QGraphicsPathItem):
         else:
             p2 = p1
 
-        # Более плавные кривые
-        dx = abs(p2.x() - p1.x()) * 0.6
-        if dx < 50:
-            dx = 50
+        # Более плавные кривые с адаптивным контролем
+        dx = abs(p2.x() - p1.x()) * 0.65
+        dy = abs(p2.y() - p1.y()) * 0.3
         
-        c1 = QPointF(p1.x() + dx, p1.y())
-        c2 = QPointF(p2.x() - dx, p2.y())
+        # Адаптивный контроль в зависимости от расстояния
+        min_control = 40
+        max_control = 150
+        distance = math.sqrt((p2.x() - p1.x())**2 + (p2.y() - p1.y())**2)
+        control_factor = min(max(distance / 200, 0.5), 1.5)
+        dx = max(min_control, min(dx * control_factor, max_control))
+        
+        c1 = QPointF(p1.x() + dx, p1.y() + dy)
+        c2 = QPointF(p2.x() - dx, p2.y() - dy)
 
         path = QPainterPath(p1)
         path.cubicTo(c1, c2, p2)
