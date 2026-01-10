@@ -25,7 +25,10 @@ from renpy_node_editor.ui.node_graph.node_view import NodeView
 from renpy_node_editor.ui.preview_panel import PreviewPanel
 from renpy_node_editor.ui.block_properties_panel import BlockPropertiesPanel
 from renpy_node_editor.ui.scene_manager_panel import SceneManagerPanel
-from renpy_node_editor.core.settings import get_splitter_sizes, save_splitter_sizes
+from renpy_node_editor.core.settings import (
+    get_splitter_sizes, save_splitter_sizes,
+    load_settings, save_settings, get_setting
+)
 from renpy_node_editor.ui.styles import get_main_window_style
 
 
@@ -52,7 +55,9 @@ class MainWindow(QMainWindow):
         self._code_generation_timer.timeout.connect(self._update_preview_code)
 
         self.setWindowTitle(tr("ui.main_window.title", "RenPy Node Editor"))
-        self.resize(1400, 800)
+        
+        # Загружаем настройки окна
+        self._load_window_settings()
         
         # Применяем темную тему
         self._apply_style()
@@ -61,6 +66,9 @@ class MainWindow(QMainWindow):
         self._create_default_project()
         self._update_window_title()
         self._connect_modification_signals()
+        
+        # Загружаем пропорции панелей после создания UI
+        self._load_splitter_sizes()
         
         # Обновляем код после полной инициализации UI
         # Используем QTimer.singleShot для отложенного вызова после полной загрузки
@@ -784,6 +792,51 @@ class MainWindow(QMainWindow):
             # Значения по умолчанию (сцены меньше, остальные равномерно)
             for i, factor in enumerate((1, 2, 2)):
                 self.right_splitter.setStretchFactor(i, factor)
+    
+    def _load_window_settings(self) -> None:
+        """Загрузить настройки окна (размер и позиция)"""
+        settings = load_settings()
+        
+        # Загружаем размер окна
+        width = settings.get("window_width", 1400)
+        height = settings.get("window_height", 800)
+        self.resize(width, height)
+        
+        # Загружаем позицию окна (если сохранена)
+        x = settings.get("window_x")
+        y = settings.get("window_y")
+        if x is not None and y is not None:
+            self.move(x, y)
+        else:
+            # Центрируем окно, если позиция не сохранена
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen().geometry()
+            window_geometry = self.frameGeometry()
+            window_geometry.moveCenter(screen.center())
+            self.move(window_geometry.topLeft())
+    
+    def _save_window_settings(self) -> None:
+        """Сохранить настройки окна (размер и позиция)"""
+        settings = load_settings()
+        settings["window_width"] = self.width()
+        settings["window_height"] = self.height()
+        settings["window_x"] = self.x()
+        settings["window_y"] = self.y()
+        save_settings(settings)
+    
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        """Обработчик закрытия окна - сохраняем настройки"""
+        self._save_window_settings()
+        # Сохраняем пропорции панелей
+        if hasattr(self, 'main_splitter'):
+            sizes = self.main_splitter.sizes()
+            if sizes and len(sizes) == 3:
+                save_splitter_sizes(sizes, "main")
+        if hasattr(self, 'right_splitter'):
+            sizes = self.right_splitter.sizes()
+            if sizes and len(sizes) == 3:
+                save_splitter_sizes(sizes, "right")
+        super().closeEvent(event)
     
     def _on_splitter_moved(self, splitter_name: str, pos: int, index: int) -> None:
         """Обработчик изменения пропорций панелей"""

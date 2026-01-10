@@ -165,16 +165,19 @@ class SettingsDialog(QDialog):
         self.settings["show_tooltips"] = self.show_tooltips.isChecked()
         self.settings["auto_center_on_load"] = self.auto_center_on_load.isChecked()
         
-        # Сохраняем язык
+        # Сохраняем язык (всегда сохраняем, даже если не выбран явно)
         selected_lang = self.language_combo.currentData()
-        if selected_lang:
-            old_lang = self.settings.get("language", "en")
-            self.settings["language"] = selected_lang
-            set_language(selected_lang)
-            reload_translations()
-            # Эмитим сигнал, если язык изменился
-            if selected_lang != old_lang:
-                self.language_changed.emit(selected_lang)
+        if not selected_lang:
+            # Если язык не выбран, используем текущий или значение по умолчанию
+            selected_lang = self.settings.get("language", "en")
+        
+        old_lang = self.settings.get("language", "en")
+        self.settings["language"] = selected_lang
+        set_language(selected_lang)
+        reload_translations()
+        # Эмитим сигнал, если язык изменился
+        if selected_lang != old_lang:
+            self.language_changed.emit(selected_lang)
         
         save_settings(self.settings)
         
