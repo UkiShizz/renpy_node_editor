@@ -680,6 +680,19 @@ class MainWindow(QMainWindow):
         if not block:
             return
         
+        # Синхронизируем CHARACTER блоки с project.characters
+        from renpy_node_editor.core.model import BlockType
+        from renpy_node_editor.core.generator.blocks import safe_get_str
+        
+        if block.type == BlockType.CHARACTER:
+            name = safe_get_str(block.params, "name")
+            display_name = safe_get_str(block.params, "display_name")
+            if name and self._controller.project:
+                # Сохраняем или обновляем персонажа в project.characters
+                if name not in self._controller.project.characters:
+                    self._controller.project.characters[name] = {}
+                self._controller.project.characters[name]["display_name"] = display_name
+        
         # Помечаем проект как измененный
         self._mark_modified()
         

@@ -731,6 +731,9 @@ def extract_background_images(project: Project) -> Dict[str, str]:
 
 def generate_definitions(project: Project) -> str:
     """Generate global definitions (define, default, image)"""
+    from renpy_node_editor.core.generator.blocks import safe_get_str
+    from renpy_node_editor.core.model import BlockType
+    
     lines: List[str] = []
     
     # Image definitions - собираем из всех IMAGE блоков в сценах
@@ -754,7 +757,7 @@ def generate_definitions(project: Project) -> str:
             lines.append(f"image {name} = \"{path}\"\n")
         lines.append("\n")
     
-    # Character definitions
+    # Character definitions из project.characters
     if project.characters:
         lines.append("# Character Definitions\n")
         for name, char_data in sorted(project.characters.items()):
@@ -766,6 +769,24 @@ def generate_definitions(project: Project) -> str:
                 lines.append(f"define {normalized_name} = Character('{display_name}')\n")
             else:
                 lines.append(f"define {normalized_name} = Character(None)\n")
+        lines.append("\n")
+    
+    # Character definitions из CHARACTER блоков (если не определены в project.characters)
+    from renpy_node_editor.core.generator.blocks import generate_character
+    character_blocks_processed = set()
+    for scene in project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.CHARACTER:
+                name = safe_get_str(block.params, "name")
+                if name and name not in project.characters and name not in character_blocks_processed:
+                    character_blocks_processed.add(name)
+                    char_code = generate_character(block, "")
+                    if char_code:
+                        if not project.characters:  # Добавляем заголовок только если его еще нет
+                            lines.append("# Character Definitions (from blocks)\n")
+                        lines.append(char_code)
+    
+    if character_blocks_processed:
         lines.append("\n")
     
     return "".join(lines)
@@ -790,6 +811,16 @@ def generate_renpy_script(project: Project) -> str:
     # Создаем маппинг оригинальных имен на нормализованные
     char_name_map: Dict[str, str] = {}
     
+    # Собираем display_name из CHARACTER блоков
+    character_display_names: Dict[str, str] = {}
+    for scene in project.scenes:
+        for block in scene.blocks:
+            if block.type == BlockType.CHARACTER:
+                name = safe_get_str(block.params, "name")
+                display_name = safe_get_str(block.params, "display_name")
+                if name and display_name:
+                    character_display_names[name] = display_name
+    
     if characters:
         lines.append("# Characters (auto-detected)\n")
         for char in sorted(characters):
@@ -797,7 +828,13 @@ def generate_renpy_script(project: Project) -> str:
             if char not in project.characters:
                 char_name = normalize_variable_name(char)
                 char_name_map[char] = char_name
-                lines.append(f"define {char_name} = Character('{char}')\n")
+                # Используем display_name из CHARACTER блока, если есть
+                display_name = character_display_names.get(char, char)
+                if display_name:
+                    display_name = display_name.replace("'", "\\'")
+                    lines.append(f"define {char_name} = Character('{display_name}')\n")
+                else:
+                    lines.append(f"define {char_name} = Character('{char}')\n")
         lines.append("\n")
     elif not project.characters:
         lines.append("define narrator = Character('Narrator')\n\n")
