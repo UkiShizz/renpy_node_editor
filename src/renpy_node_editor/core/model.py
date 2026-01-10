@@ -172,13 +172,7 @@ class Project:
     
     def remove_scene(self, scene_id: str) -> None:
         """Удалить сцену из проекта"""
-        original_count = len(self.scenes)
         self.scenes = [s for s in self.scenes if s.id != scene_id]
-        # Проверяем, что сцена действительно удалена
-        if len(self.scenes) == original_count:
-            # Сцена не была найдена - возможно ID не совпадает
-            # Пробуем найти по имени или другим способом
-            pass
     def move_scene_up(self, scene_id: str) -> bool:
         """Переместить сцену вверх в списке (раньше в порядке генерации)"""
         for i, scene in enumerate(self.scenes):

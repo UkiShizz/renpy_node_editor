@@ -15,6 +15,14 @@ def safe_get_str(params: dict[str, Any], key: str, default: str = "") -> str:
     return str(value).strip()
 
 
+def get_start_block_label(block: Block) -> str:
+    """Get label from START block, trying multiple key variations"""
+    label = safe_get_str(block.params, "label", "")
+    if not label:
+        label = safe_get_str(block.params, "Имя метки (label):", "")
+    return label
+
+
 def generate_label(scene: Scene) -> str:
     """Generate label statement"""
     return f"label {scene.label}:\n"
@@ -25,10 +33,7 @@ def generate_say(block: Block, indent: str) -> str:
     who = safe_get_str(block.params, "who")
     text = safe_get_str(block.params, "text")
     
-    print(f"DEBUG generate_say: Блок {block.id}, who='{who}', text='{text}', params keys: {list(block.params.keys())}")
-    
     if not text:
-        print(f"DEBUG generate_say: Текст пустой, возвращаем пустую строку")
         return ""
     
     text = escape_text(text)
@@ -198,14 +203,9 @@ def generate_jump(block: Block, indent: str, generated_labels: Optional[set] = N
     if not target:
         return ""
     
-    # Проверяем, существует ли целевой label
-    if generated_labels is not None:
-        if target not in generated_labels:
-            # Label не существует - не генерируем jump
-            print(f"DEBUG generate_jump: target '{target}' не найден в generated_labels. Доступные: {sorted(generated_labels)}")
-            return ""
-        else:
-            print(f"DEBUG generate_jump: target '{target}' найден в generated_labels, генерируем jump")
+    # Only generate jump if target label exists
+    if generated_labels is not None and target not in generated_labels:
+        return ""
     
     return f"{indent}jump {target}\n"
 
@@ -216,14 +216,9 @@ def generate_call(block: Block, indent: str, generated_labels: Optional[set] = N
     if not label:
         return ""
     
-    # Проверяем, существует ли целевой label
-    if generated_labels is not None:
-        if label not in generated_labels:
-            # Label не существует - не генерируем call
-            print(f"DEBUG generate_call: label '{label}' не найден в generated_labels. Доступные: {sorted(generated_labels)}")
-            return ""
-        else:
-            print(f"DEBUG generate_call: label '{label}' найден в generated_labels, генерируем call")
+    # Only generate call if target label exists
+    if generated_labels is not None and label not in generated_labels:
+        return ""
     
     return f"{indent}call {label}\n"
 
@@ -235,17 +230,9 @@ def generate_return(block: Block, indent: str) -> str:
 
 def generate_start(block: Block, indent: str, project_scenes: Optional[list] = None) -> str:
     """Generate start block with its own label"""
-    # Пробуем разные варианты ключей для label
-    label = safe_get_str(block.params, "label", "")
-    if not label:
-        label = safe_get_str(block.params, "Имя метки (label):", "")
-    
-    # Если лейбл не указан, не генерируем код
+    label = get_start_block_label(block)
     if not label:
         return ""
-    
-    # Генерируем label для START блока
-    # НЕ добавляем return здесь - он будет добавлен в конце сцены, если нужно
     return f"{indent}label {label}:\n"
 
 
