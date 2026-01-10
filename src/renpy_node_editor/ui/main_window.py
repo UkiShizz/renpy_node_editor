@@ -794,34 +794,50 @@ class MainWindow(QMainWindow):
                 self.right_splitter.setStretchFactor(i, factor)
     
     def _load_window_settings(self) -> None:
-        """Загрузить настройки окна (размер и позиция)"""
+        """Загрузить настройки окна (размер, позиция и состояние максимизации)"""
         settings = load_settings()
         
-        # Загружаем размер окна
-        width = settings.get("window_width", 1400)
-        height = settings.get("window_height", 800)
-        self.resize(width, height)
+        # Загружаем состояние максимизации
+        is_maximized = settings.get("window_maximized", False)
         
-        # Загружаем позицию окна (если сохранена)
-        x = settings.get("window_x")
-        y = settings.get("window_y")
-        if x is not None and y is not None:
-            self.move(x, y)
+        if is_maximized:
+            # Если окно было максимизировано, показываем его максимизированным
+            # Размер и позиция будут восстановлены автоматически при разворачивании
+            self.showMaximized()
         else:
-            # Центрируем окно, если позиция не сохранена
-            from PySide6.QtWidgets import QApplication
-            screen = QApplication.primaryScreen().geometry()
-            window_geometry = self.frameGeometry()
-            window_geometry.moveCenter(screen.center())
-            self.move(window_geometry.topLeft())
+            # Загружаем размер окна
+            width = settings.get("window_width", 1400)
+            height = settings.get("window_height", 800)
+            self.resize(width, height)
+            
+            # Загружаем позицию окна (если сохранена)
+            x = settings.get("window_x")
+            y = settings.get("window_y")
+            if x is not None and y is not None:
+                self.move(x, y)
+            else:
+                # Центрируем окно, если позиция не сохранена
+                from PySide6.QtWidgets import QApplication
+                screen = QApplication.primaryScreen().geometry()
+                window_geometry = self.frameGeometry()
+                window_geometry.moveCenter(screen.center())
+                self.move(window_geometry.topLeft())
     
     def _save_window_settings(self) -> None:
-        """Сохранить настройки окна (размер и позиция)"""
+        """Сохранить настройки окна (размер, позиция и состояние максимизации)"""
         settings = load_settings()
-        settings["window_width"] = self.width()
-        settings["window_height"] = self.height()
-        settings["window_x"] = self.x()
-        settings["window_y"] = self.y()
+        
+        # Сохраняем состояние максимизации
+        settings["window_maximized"] = self.isMaximized()
+        
+        # Сохраняем размер и позицию только если окно не максимизировано
+        # (иначе сохранятся размеры максимизированного окна, что не нужно)
+        if not self.isMaximized():
+            settings["window_width"] = self.width()
+            settings["window_height"] = self.height()
+            settings["window_x"] = self.x()
+            settings["window_y"] = self.y()
+        
         save_settings(settings)
     
     def closeEvent(self, event) -> None:  # type: ignore[override]

@@ -109,6 +109,7 @@ def _get_default_settings() -> Dict[str, Any]:
         "window_height": 800,
         "window_x": None,  # None означает центрирование
         "window_y": None,
+        "window_maximized": False,  # Состояние максимизации окна
         "splitter_sizes_main": [0, 840, 560],  # preview, nodes, palette
         "splitter_sizes_right": [200, 300, 300],  # scenes, palette, properties
         "preview_panel_visible": False,
