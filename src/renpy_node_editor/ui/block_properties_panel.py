@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import json
 
 from PySide6.QtWidgets import (
@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QTextEdit, QComboBox,
     QFileDialog
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont
 
 from renpy_node_editor.core.model import Block, BlockType, Project
@@ -176,11 +176,6 @@ class BlockPropertiesPanel(QWidget):
         title.setAlignment(Qt.AlignCenter)
         self.properties_layout.addWidget(title)
         
-        save_button = QPushButton("💾 Сохранить свойства", self)
-        save_button.setToolTip("Сохранить изменения в свойствах блока")
-        save_button.clicked.connect(self._on_save)
-        self.properties_layout.addWidget(save_button)
-        
         self.properties_layout.addStretch()
         self.setLayout(self.properties_layout)
 
@@ -191,7 +186,7 @@ class BlockPropertiesPanel(QWidget):
 
     def _update_properties(self) -> None:
         """Update the properties based on block type"""
-        for i in reversed(range(2, self.properties_layout.count())):
+        for i in reversed(range(1, self.properties_layout.count())):
             widget = self.properties_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
@@ -318,6 +313,8 @@ class BlockPropertiesPanel(QWidget):
         value = self.current_block.params.get(key, default) if self.current_block else default
         input_widget.setText(str(value))
         input_widget.setToolTip(tooltip)
+        # Подключаем автоматическое сохранение при завершении редактирования
+        input_widget.editingFinished.connect(lambda: self._save_single_param(key, input_widget.text()))
         self._param_widgets[key] = input_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, input_widget)
 
@@ -373,6 +370,8 @@ class BlockPropertiesPanel(QWidget):
                 combo.setToolTip(tooltip)
         
         combo.highlighted.connect(on_highlighted)
+        # Подключаем автоматическое сохранение при изменении значения
+        combo.currentTextChanged.connect(lambda text: self._save_single_param(key, text.strip() if text else ""))
         
         self._param_widgets[key] = combo
         bg_container.addWidget(combo, 1)
@@ -431,6 +430,8 @@ class BlockPropertiesPanel(QWidget):
         value = self.current_block.params.get(key, default) if self.current_block else default
         input_widget.setText(str(value))
         input_widget.setToolTip(tooltip)
+        # Подключаем автоматическое сохранение при завершении редактирования
+        input_widget.editingFinished.connect(lambda: self._save_single_param(key, input_widget.text()))
         self._param_widgets[key] = input_widget
         file_container.addWidget(input_widget, 1)
         
@@ -492,6 +493,22 @@ class BlockPropertiesPanel(QWidget):
         self._param_widgets[key] = code_widget
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, code_widget)
 
+    def _save_single_param(self, key: str, value: Any) -> None:
+        """Сохранить один параметр автоматически"""
+        if not self.current_block:
+            return
+        
+        # Сохраняем значение в блок
+        if isinstance(value, str):
+            self.current_block.params[key] = value
+        elif isinstance(value, bool):
+            self.current_block.params[key] = value
+        else:
+            self.current_block.params[key] = value
+        
+        # Эмитим сигнал для обновления UI и генерации кода
+        self.properties_saved.emit(self.current_block)
+    
     def _add_checkbox(self, key: str, label: str, default: bool = False) -> None:
         """Add a checkbox for a boolean parameter."""
         checkbox = QCheckBox(label, self)
@@ -501,6 +518,8 @@ class BlockPropertiesPanel(QWidget):
         checkbox.setChecked(bool(value))
         tooltip = get_parameter_tooltip(key)
         checkbox.setToolTip(tooltip)
+        # Подключаем автоматическое сохранение при изменении состояния
+        checkbox.stateChanged.connect(lambda state: self._save_single_param(key, state == Qt.CheckState.Checked.value))
         self._param_widgets[key] = checkbox
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, checkbox)
     
@@ -593,6 +612,8 @@ class BlockPropertiesPanel(QWidget):
                 combo.setToolTip(tooltip)
         
         combo.highlighted.connect(on_highlighted)
+        # Подключаем автоматическое сохранение при изменении значения
+        combo.currentTextChanged.connect(lambda text: self._save_single_param(key, text.strip() if text else ""))
         
         self._param_widgets[key] = combo
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, combo)
@@ -995,6 +1016,8 @@ class BlockPropertiesPanel(QWidget):
         
         combo.setToolTip(tooltip)
         combo.setStyleSheet(self._get_combo_style())
+        # Подключаем автоматическое сохранение при изменении значения
+        combo.currentTextChanged.connect(lambda text: self._save_single_param(key, text.strip() if text else ""))
         
         self._param_widgets[key] = combo
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, combo)
@@ -1035,6 +1058,8 @@ class BlockPropertiesPanel(QWidget):
         
         combo.setToolTip(tooltip)
         combo.setStyleSheet(self._get_combo_style())
+        # Подключаем автоматическое сохранение при изменении значения
+        combo.currentTextChanged.connect(lambda text: self._save_single_param(key, text.strip() if text else ""))
         
         self._param_widgets[key] = combo
         self.properties_layout.insertWidget(self.properties_layout.count() - 1, combo)
@@ -1071,6 +1096,8 @@ class BlockPropertiesPanel(QWidget):
         
         combo.setToolTip(tooltip)
         combo.setStyleSheet(self._get_combo_style())
+        # Подключаем автоматическое сохранение при изменении значения
+        combo.currentTextChanged.connect(lambda text: self._save_single_param(key, text.strip() if text else ""))
         
         self._param_widgets[key] = combo
         audio_container.addWidget(combo, 1)
