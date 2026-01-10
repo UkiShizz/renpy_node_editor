@@ -25,6 +25,9 @@ class SceneManagerPanel(QWidget):
     # Signal emitted when scene selection changes
     scene_selected = Signal(object)  # emits Scene
     
+    # Signal emitted when scenes are added/removed
+    scenes_modified = Signal()
+    
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         
@@ -216,14 +219,8 @@ class SceneManagerPanel(QWidget):
         # Устанавливаем новую сцену как текущую
         self._current_scene = scene_from_project
         
-        # Сохраняем проект после добавления сцены
-        # Получаем контроллер через родительское окно
-        parent_window = self.window()
-        if hasattr(parent_window, '_controller'):
-            try:
-                parent_window._controller.save_current_project()
-            except Exception:
-                pass  # Игнорируем ошибки сохранения
+        # Эмитим сигнал об изменении сцен
+        self.scenes_modified.emit()
         
         # Автоматически выбираем новую сцену (используем объект из проекта)
         self.scene_selected.emit(scene_from_project)

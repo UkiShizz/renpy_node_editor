@@ -227,6 +227,10 @@ class NodeItem(QGraphicsRectItem):
 
                 self.block.x = self.pos().x()
                 self.block.y = self.pos().y()
+                
+                # Эмитим сигнал об изменении проекта (изменение позиции блока)
+                if hasattr(scene, 'project_modified'):
+                    scene.project_modified.emit()
             except Exception:
                 # Игнорируем ошибки при обновлении путей
                 pass

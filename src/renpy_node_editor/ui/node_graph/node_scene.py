@@ -31,6 +31,9 @@ class NodeScene(QGraphicsScene):
     
     # Signal emitted when a node is selected/deselected
     node_selection_changed = Signal(object)  # emits Block or None
+    
+    # Signal emitted when project is modified (blocks/connections added/removed)
+    project_modified = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -545,6 +548,9 @@ class NodeScene(QGraphicsScene):
         self._scene_model.add_block(block)
 
         self._create_node_item_for_block(block)
+        
+        # Эмитим сигнал об изменении проекта
+        self.project_modified.emit()
 
         event.acceptProposedAction()
 
@@ -632,6 +638,9 @@ class NodeScene(QGraphicsScene):
                     # Это гарантирует, что _scene_model всегда указывает на объект из project.scenes
                     self._scene_model = scene_in_project
                     self._drag_connection.connection_id = connection_id
+                    
+                    # Эмитим сигнал об изменении проекта
+                    self.project_modified.emit()
                 
                 self._drag_connection.set_dst_port(item)
                 self._drag_src_port.add_connection(self._drag_connection)
@@ -774,6 +783,8 @@ class NodeScene(QGraphicsScene):
                 
                 # Удаляем из правильного объекта Scene (это также удалит порты и connections)
                 scene_to_use.remove_block(item.block.id)
+                # Эмитим сигнал об изменении проекта
+                self.project_modified.emit()
                 # Удаляем визуально
                 self.removeItem(item)
     
@@ -801,6 +812,8 @@ class NodeScene(QGraphicsScene):
             
             # Удаляем connection из правильного объекта Scene
             scene_to_use.remove_connection(connection_item.connection_id)
+            # Эмитим сигнал об изменении проекта
+            self.project_modified.emit()
             
             # Обновляем локальную ссылку, если это тот же объект
             if self._scene_model.id == scene_to_use.id:

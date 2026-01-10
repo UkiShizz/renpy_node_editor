@@ -40,6 +40,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._controller = EditorController()
+        
+        # Флаг для отслеживания несохраненных изменений
+        self._is_modified = False
 
         self.setWindowTitle("RenPy Node Editor")
         self.resize(1400, 800)
@@ -50,6 +53,70 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._create_default_project()
         self._update_window_title()
+        self._connect_modification_signals()
+    
+    def _connect_modification_signals(self) -> None:
+        """Подключить сигналы для отслеживания изменений проекта"""
+        # Изменения свойств блоков
+        self.properties_panel.properties_saved.connect(self._mark_modified)
+        
+        # Изменения в node_scene (добавление/удаление блоков и соединений)
+        if self.node_view and self.node_view.node_scene:
+            self.node_view.node_scene.project_modified.connect(self._mark_modified)
+        
+        # Изменения в сценах (добавление/удаление)
+        self.scene_manager.scenes_modified.connect(self._mark_modified)
+    
+    def _mark_modified(self) -> None:
+        """Пометить проект как измененный"""
+        if not self._controller.project:
+            return
+        self._is_modified = True
+        self._update_save_button()
+    
+    def _mark_saved(self) -> None:
+        """Пометить проект как сохраненный"""
+        self._is_modified = False
+        self._update_save_button()
+    
+    def _update_save_button(self) -> None:
+        """Обновить состояние кнопки сохранения"""
+        if not self.btn_save:
+            return
+        
+        if self._is_modified and self._controller.project:
+            self.btn_save.setEnabled(True)
+            self.btn_save.setStyleSheet("""
+                QPushButton {
+                    background-color: #4A90E2;
+                    border: 2px solid #5BA0F2;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    color: #FFFFFF;
+                    font-weight: bold;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background-color: #5BA0F2;
+                    border-color: #6BB0FF;
+                }
+                QPushButton:pressed {
+                    background-color: #3A80D2;
+                }
+            """)
+        else:
+            self.btn_save.setEnabled(False)
+            self.btn_save.setStyleSheet("""
+                QPushButton {
+                    background-color: #2A2A2A;
+                    border: 2px solid #3A3A3A;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    color: #808080;
+                    font-weight: bold;
+                    font-size: 11px;
+                }
+            """)
 
     def _apply_style(self) -> None:
         """Применить современный стиль к окну"""
@@ -108,8 +175,9 @@ class MainWindow(QMainWindow):
         btn_new.setToolTip("Создать новый проект визуальной новеллы")
         btn_open = QPushButton("📂 Открыть", self)
         btn_open.setToolTip("Открыть существующий проект")
-        btn_save = QPushButton("💾 Сохранить", self)
-        btn_save.setToolTip("Сохранить текущий проект")
+        self.btn_save = QPushButton("💾 Сохранить", self)
+        self.btn_save.setToolTip("Сохранить текущий проект")
+        self.btn_save.setEnabled(False)  # По умолчанию неактивна
         btn_generate = QPushButton("⚙️ Сгенерировать код", self)
         btn_generate.setToolTip("Сгенерировать Ren'Py код и показать в панели предпросмотра")
         btn_export = QPushButton("📤 Экспорт в Ren'Py", self)
@@ -123,7 +191,7 @@ class MainWindow(QMainWindow):
 
         btn_new.clicked.connect(self._on_new_project)
         btn_open.clicked.connect(self._on_open_project)
-        btn_save.clicked.connect(self._on_save_project)
+        self.btn_save.clicked.connect(self._on_save_project)
         btn_generate.clicked.connect(self._on_generate_code)
         btn_export.clicked.connect(self._on_export_rpy)
         btn_center.clicked.connect(self._on_center_view)
@@ -131,7 +199,7 @@ class MainWindow(QMainWindow):
 
         # Кнопка просмотра кода слева, остальные справа
         top_bar.addWidget(self.btn_toggle_preview)
-        for w in (btn_new, btn_open, btn_save, btn_generate, btn_export, btn_center):
+        for w in (btn_new, btn_open, self.btn_save, btn_generate, btn_export, btn_center):
             top_bar.addWidget(w)
         top_bar.addStretch(1)
 
@@ -256,6 +324,9 @@ class MainWindow(QMainWindow):
         self._controller._state.current_project = project
         self._controller._state.current_project_path = None
         
+        # Сбрасываем флаг изменений для нового проекта
+        self._mark_saved()
+        
         # Загружаем проект в UI
         self._load_project(project, scene)
     
@@ -268,6 +339,9 @@ class MainWindow(QMainWindow):
             
             # Переподключаем сигналы сразу после установки сцены
             self._connect_scene_signals()
+            
+            # Переподключаем сигналы отслеживания изменений
+            self._connect_modification_signals()
             
             self.preview_panel.clear()
             self._update_window_title()
@@ -302,6 +376,9 @@ class MainWindow(QMainWindow):
         # Устанавливаем проект в контроллере, но БЕЗ пути (будет запрошен при сохранении)
         self._controller._state.current_project = project
         self._controller._state.current_project_path = None
+        
+        # Сбрасываем флаг изменений для нового проекта
+        self._mark_saved()
         
         self._load_project(project, scene)
 
@@ -339,6 +416,9 @@ class MainWindow(QMainWindow):
         self.node_view.set_project_and_scene(project, scene)
         self.preview_panel.clear()
         self._update_window_title()
+        
+        # Сбрасываем флаг изменений при открытии проекта
+        self._mark_saved()
 
     def _on_save_project(self) -> None:
         if not self._controller.project:
@@ -409,6 +489,9 @@ class MainWindow(QMainWindow):
             )
         else:
             QMessageBox.information(self, "Сохранено", "Проект сохранён.")
+        
+        # Помечаем проект как сохраненный
+        self._mark_saved()
 
     def _on_generate_code(self) -> None:
         code = self._controller.generate_script()
@@ -568,6 +651,9 @@ class MainWindow(QMainWindow):
         """Handle properties saved - update the visual representation"""
         if not block:
             return
+        
+        # Помечаем проект как измененный
+        self._mark_modified()
         
         try:
             from renpy_node_editor.ui.node_graph.node_item import NodeItem
