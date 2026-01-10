@@ -666,41 +666,57 @@ class NodeScene(QGraphicsScene):
         
         # Подсветка соединений, связанных с выбранными блоками
         try:
-            # Сначала сбрасываем подсветку всех соединений
-            items_list = list(self.items())  # Создаем копию списка для безопасной итерации
+            # Получаем список всех соединений в сцене
+            all_connections = []
+            items_list = list(self.items())
             for item in items_list:
                 if isinstance(item, ConnectionItem):
-                    try:
-                        if hasattr(item, 'set_highlighted'):
-                            item.set_highlighted(False)
-                            item.update()
-                    except (RuntimeError, AttributeError):
-                        continue
+                    all_connections.append(item)
             
-            # Подсвечиваем соединения, связанные с выбранными блоками
+            # Сначала сбрасываем подсветку всех соединений
+            for connection in all_connections:
+                try:
+                    if hasattr(connection, 'set_highlighted'):
+                        connection.set_highlighted(False)
+                        connection.update()
+                except (RuntimeError, AttributeError):
+                    continue
+            
+            # Получаем выбранные блоки
             selected_items = self.selectedItems()
             selected_nodes = [item for item in selected_items if isinstance(item, NodeItem)]
             
-            for node_item in selected_nodes:
-                try:
-                    # Проверяем, что узел еще существует
-                    if not hasattr(node_item, 'inputs') or not hasattr(node_item, 'outputs'):
+            if selected_nodes:
+                # Собираем все порты выбранных блоков
+                selected_ports = set()
+                for node_item in selected_nodes:
+                    try:
+                        if hasattr(node_item, 'inputs'):
+                            for port in node_item.inputs:
+                                selected_ports.add(port)
+                        if hasattr(node_item, 'outputs'):
+                            for port in node_item.outputs:
+                                selected_ports.add(port)
+                    except (RuntimeError, AttributeError):
                         continue
-                    
-                    # Подсвечиваем все соединения этого блока
-                    for port in list(node_item.inputs) + list(node_item.outputs):
-                        if not hasattr(port, 'connections'):
-                            continue
-                        for connection in list(port.connections):
-                            try:
-                                if hasattr(connection, 'set_highlighted'):
-                                    connection.set_highlighted(True)
-                                    connection.update()
-                            except (RuntimeError, AttributeError):
-                                continue
-                except (RuntimeError, AttributeError):
-                    continue
-        except (RuntimeError, AttributeError):
+                
+                # Подсвечиваем соединения, связанные с выбранными портами
+                for connection in all_connections:
+                    try:
+                        # Проверяем, связано ли соединение с выбранными портами
+                        is_connected = False
+                        if hasattr(connection, 'src_port') and connection.src_port in selected_ports:
+                            is_connected = True
+                        if hasattr(connection, 'dst_port') and connection.dst_port in selected_ports:
+                            is_connected = True
+                        
+                        if is_connected and hasattr(connection, 'set_highlighted'):
+                            connection.set_highlighted(True)
+                            connection.update()
+                    except (RuntimeError, AttributeError):
+                        continue
+        except (RuntimeError, AttributeError) as e:
+            # Игнорируем ошибки при подсветке
             pass
         
         try:

@@ -58,8 +58,9 @@ class ConnectionItem(QGraphicsPathItem):
     
     def set_highlighted(self, highlighted: bool) -> None:
         """Установить подсветку соединения"""
-        self._is_highlighted = highlighted
-        self.update()
+        if self._is_highlighted != highlighted:
+            self._is_highlighted = highlighted
+            self.update()  # Принудительно обновляем отрисовку
 
     def update_path(self):
         """Redraw smooth curve between ports with arrow at the end"""
@@ -145,21 +146,43 @@ class ConnectionItem(QGraphicsPathItem):
             return
         
         # Рисуем тень для глубины
-        shadow_pen = QPen(QColor(0, 0, 0, 50), 4)
+        shadow_opacity = 80 if self._is_highlighted else 50
+        shadow_width = 5 if self._is_highlighted else 4
+        shadow_pen = QPen(QColor(0, 0, 0, shadow_opacity), shadow_width)
         shadow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         shadow_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(shadow_pen)
         painter.drawPath(path)
         
+        # Подсветка при выделении связанных блоков
+        if self._is_highlighted:
+            # Внешнее свечение
+            glow_color = QColor(74, 158, 255, 100)  # #4A9EFF
+            glow_pen = QPen(glow_color, 6)
+            glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            glow_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(glow_pen)
+            painter.drawPath(path)
+        
         # Основная линия с градиентом
         if self.dst_port is not None:
             # Установленное соединение - используем градиент
-            gradient = QLinearGradient(path.pointAtPercent(0), path.pointAtPercent(1))
-            gradient.setColorAt(0, self._base_color.lighter(130))
-            gradient.setColorAt(0.5, self._highlight_color)
-            gradient.setColorAt(1, self._highlight_color.lighter(110))
+            if self._is_highlighted:
+                # Более яркий градиент для подсвеченного соединения
+                gradient = QLinearGradient(path.pointAtPercent(0), path.pointAtPercent(1))
+                highlight_blue = QColor(74, 158, 255)  # #4A9EFF
+                gradient.setColorAt(0, highlight_blue.lighter(120))
+                gradient.setColorAt(0.5, highlight_blue)
+                gradient.setColorAt(1, highlight_blue.lighter(110))
+                line_width = 4
+            else:
+                gradient = QLinearGradient(path.pointAtPercent(0), path.pointAtPercent(1))
+                gradient.setColorAt(0, self._base_color.lighter(130))
+                gradient.setColorAt(0.5, self._highlight_color)
+                gradient.setColorAt(1, self._highlight_color.lighter(110))
+                line_width = 3
             
-            pen = QPen(QBrush(gradient), 3)
+            pen = QPen(QBrush(gradient), line_width)
             pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
             painter.setPen(pen)
